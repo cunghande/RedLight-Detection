@@ -1,0 +1,40 @@
+[
+  {
+    "ma_bien_ban": "PN-20261013-0002",
+    "tieu_de": "THÔNG BÁO VI PHẠM TRẬT TỰ AN TOÀN GIAO THÔNG ĐƯỜNG BỘ (PHẠT NGUỘI)",
+    "loai_vi_pham": "Không chấp hành hiệu lệnh của đèn tín hiệu giao thông (Vượt đèn đỏ)",
+    "can_cu_phap_ly": "Điểm a Khoản 5 Điều 5 NĐ 100/2019/NĐ-CP (sửa đổi NĐ 123/2021)",
+    "thong_tin_phuong_tien": {
+      "ma_dinh_danh_track_id": 2,
+      "loai_phuong_tien": "O to",
+      "do_tin_cay_ai": "72.4%",
+      "mo_hinh_nhan_dien": "YOLO (yolov8s.pt)"
+    },
+    "thoi_gian_dia_diem": {
+      "thoi_diem_ghi_nhan": "2026-10-13 16:40:15",
+      "nguon_video": "red1.mp4",
+      "khung_hinh_frame": 57,
+      "tin_hieu_den": "RED (ĐÈN ĐỎ)",
+      "toa_do_vach_dung": [
+        [
+          60,
+          360
+        ],
+        [
+          620,
+          360
+        ]
+      ]
+    },
+    "muc_xu_phat_du_kien": {
+      "tien_phat": "4.000.000 - 6.000.000 VNĐ",
+      "hinh_thuc_bo_sung": "Tước quyền sử dụng GPLX từ 01 đến 03 tháng",
+      "bien_phap_khac": "Trừ điểm Giấy phép lái xe theo Luật TTATGTĐB mới"
+    },
+    "hinh_anh_bang_chung": {
+      "anh_hien_truong": "PN-20261013-0002_scene.jpg",
+      "anh_phuong_tien": "PN-20261013-0002_vehicle.jpg"
+    },
+    "trang_thai_xu_ly": "ĐÃ LẬP HỒ SƠ - CHỜ GỬI THÔNG BÁO PHẠT NGUỘI"
+  }
+]

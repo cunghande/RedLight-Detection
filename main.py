@@ -56,7 +56,10 @@ def draw_hud(frame, traffic_state, total_violations, fps, recent_violations):
                     cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 100, 255), 2)
         
         for i, viol in enumerate(reversed(recent_violations[-4:])):
-            txt = f"[!] ID: {viol['track_id']} | {viol['vehicle_type']} | {viol['time'][-8:]}"
+            tid = viol.get("track_id") or viol.get("thong_tin_phuong_tien", {}).get("ma_dinh_danh_track_id", "?")
+            vtype = viol.get("vehicle_type") or viol.get("thong_tin_phuong_tien", {}).get("loai_phuong_tien", "Xe")
+            vcode = viol.get("ma_bien_ban", f"ID:{tid}")
+            txt = f"[!] {vcode}: {vtype}"
             cv2.putText(frame, txt, (panel_x + 12, panel_y + 52 + i * 26),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.48, (255, 255, 255), 1)
 
@@ -82,7 +85,7 @@ def run_detection(source, output_video=None, model_path=config.MODEL_PATH, headl
         roi=config.TRAFFIC_LIGHT_ROI,
         timer_cycle=config.TIMER_CYCLE
     )
-    detector = RedLightViolationDetector(model_path=model_path)
+    detector = RedLightViolationDetector(model_path=model_path, source_name=str(source))
 
     # Thiet lap VideoWriter neu nguoi dung muon luu video ket qua
     writer = None
@@ -98,6 +101,7 @@ def run_detection(source, output_video=None, model_path=config.MODEL_PATH, headl
     prev_time = time.time()
     fps = 0.0
     paused = False
+    frame_idx = 0
 
     print("\n" + "="*50)
     print(" HE THONG PHAT HIEN VUOT DEN DO DANG CHAY")
@@ -114,12 +118,13 @@ def run_detection(source, output_video=None, model_path=config.MODEL_PATH, headl
             if not ret:
                 print("[INFO] Da xem het video.")
                 break
+            frame_idx += 1
 
             # 1. Cap nhat trang thai den
             traffic_state = tl_detector.update(frame)
 
             # 2. Xu ly tracking & phat hien vuot den do
-            annotated_frame, new_violations = detector.process_frame(frame, traffic_state)
+            annotated_frame, new_violations = detector.process_frame(frame, traffic_state, frame_idx=frame_idx)
 
             # 3. Ve hop den giao thong
             tl_detector.draw(annotated_frame)
@@ -160,7 +165,8 @@ def run_detection(source, output_video=None, model_path=config.MODEL_PATH, headl
     if not headless:
         cv2.destroyAllWindows()
     print(f"\n[HOAN TAT] Tong so phuong tien vi pham: {len(detector.violated_ids)}")
-    print(f"Bang chung vi pham duoc luu tai thu muc: {config.OUTPUT_DIR}")
+    print(f"File bao cao phat nguoi JSON: {config.OUTPUT_DIR / 'traffic_citations.json'}")
+    print(f"File bao cao tong hop Markdown: {config.OUTPUT_DIR / 'traffic_citations_report.md'}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="He thong phat hien vuot den do bang YOLO")

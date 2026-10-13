@@ -78,13 +78,17 @@ class CentroidTracker:
         return self.objects.copy()
 
 class RedLightViolationDetector:
-    def __init__(self, model_path=config.MODEL_PATH, conf=config.CONF_THRESHOLD):
+    def __init__(self, model_path=config.MODEL_PATH, conf=config.CONF_THRESHOLD, stop_line=None, source_name="video"):
         self.detector = get_detector(model_path)
         self.model_name = self.detector.name
-        print(f"[INFO] He thong khoi tao thanh cong voi model: {self.model_name}")
         self.conf = conf
-        self.stop_line = config.STOP_LINE
+        self.source_name = source_name
+        
+        # Lay vach dung theo cau hinh hoac tu dong theo video
+        self.stop_line = stop_line or config.get_stop_line(source_name)
         self.direction = config.MOVE_DIRECTION
+        print(f"[INFO] Khoi tao thanh cong voi model: {self.model_name}")
+        print(f"[INFO] Vi tri vach dung Stop Line: {self.stop_line}")
         
         self.tracker = CentroidTracker()
         self.previous_positions = {}
@@ -104,17 +108,24 @@ class RedLightViolationDetector:
         
         if not line_intersect:
             y_line = (p1[1] + p2[1]) / 2
-            if self.direction == "TOP_TO_BOTTOM":
-                line_intersect = (pt_prev[1] <= y_line and pt_curr[1] > y_line)
-            else:
-                line_intersect = (pt_prev[1] >= y_line and pt_curr[1] < y_line)
+            x_min = min(p1[0], p2[0]) - 50
+            x_max = max(p1[0], p2[0]) + 50
+            
+            # Kiem tra xem xe co di qua vung x cua vach dung khong
+            if x_min <= pt_curr[0] <= x_max:
+                if self.direction == "TOP_TO_BOTTOM":
+                    line_intersect = (pt_prev[1] <= y_line and pt_curr[1] > y_line)
+                else:
+                    line_intersect = (pt_prev[1] >= y_line and pt_curr[1] < y_line)
         return line_intersect
 
-    def process_frame(self, frame, traffic_state: str):
+    def process_frame(self, frame, traffic_state: str, frame_idx: int = 0):
         current_violations = []
         boxes, scores, class_names = self.detector.detect(frame, conf_thresh=self.conf)
 
         annotated_frame = frame.copy()
+        
+        # Mau sac vach dung tuy theo trang thai den
         line_color = (0, 0, 255) if traffic_state == "RED" else (
             (0, 255, 255) if traffic_state == "YELLOW" else (0, 255, 0)
         )
@@ -144,12 +155,11 @@ class RedLightViolationDetector:
                 min_dist = float("inf")
                 for t_id, t_centroid in tracked_objects.items():
                     dist = np.linalg.norm(np.array(curr_pt) - np.array(t_centroid))
-                    if dist < min_dist and dist < 40:
+                    if dist < min_dist and dist < 45:
                         min_dist = dist
                         matched_id = t_id
                         
                 track_id = matched_id if matched_id is not None else (i + 1)
-
                 is_violation = track_id in self.violated_ids
 
                 if not is_violation and track_id in self.previous_positions:
@@ -162,7 +172,8 @@ class RedLightViolationDetector:
                             box=box,
                             track_id=track_id,
                             cls_name=cls_name,
-                            conf=float(conf)
+                            conf=float(conf),
+                            frame_idx=frame_idx
                         )
                         current_violations.append(violation_info)
 
@@ -170,7 +181,7 @@ class RedLightViolationDetector:
 
                 if is_violation:
                     box_color = (0, 0, 255)
-                    label = f"[VUOT DEN DO] ID:{track_id} {cls_name}"
+                    label = f"[PHAT NGUOI] ID:{track_id} {cls_name}"
                     cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), box_color, 3)
                     cv2.circle(annotated_frame, curr_pt, 6, (0, 0, 255), -1)
                 else:
@@ -199,50 +210,121 @@ class RedLightViolationDetector:
 
         return annotated_frame, current_violations
 
-    def _record_violation(self, frame, box, track_id, cls_name, conf):
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        v_id = f"VIOLATION_{timestamp}_ID{track_id}"
+    def _record_violation(self, frame, box, track_id, cls_name, conf, frame_idx):
+        timestamp_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        file_ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        citation_code = f"PN-{datetime.now().strftime('%Y%m%d')}-{track_id:04d}"
         
-        scene_filename = self.output_dir / f"{v_id}_scene.jpg"
+        # 1. Luu anh hien truong toan canh
+        scene_filename = self.output_dir / f"{citation_code}_scene.jpg"
         scene_img = frame.copy()
         x1, y1, x2, y2 = map(int, box)
         cv2.rectangle(scene_img, (x1, y1), (x2, y2), (0, 0, 255), 3)
         cv2.putText(
             scene_img,
-            f"VIOLATION: RED LIGHT RUNNER - ID:{track_id} ({cls_name})",
+            f"BIEN BAN PHAT NGUOI: {citation_code} - {cls_name} ID:{track_id}",
             (x1, max(30, y1 - 10)),
             cv2.FONT_HERSHEY_SIMPLEX,
-            0.7,
+            0.65,
             (0, 0, 255),
             2
         )
         cv2.imwrite(str(scene_filename), scene_img)
 
+        # 2. Luu anh crop phuong tien
         h, w = frame.shape[:2]
         crop_x1 = max(0, x1 - 10)
         crop_y1 = max(0, y1 - 10)
         crop_x2 = min(w, x2 + 10)
         crop_y2 = min(h, y2 + 10)
         crop_img = frame[crop_y1:crop_y2, crop_x1:crop_x2]
-        crop_filename = self.output_dir / f"{v_id}_vehicle.jpg"
+        crop_filename = self.output_dir / f"{citation_code}_vehicle.jpg"
         if crop_img.size > 0:
             cv2.imwrite(str(crop_filename), crop_img)
 
-        info = {
-            "violation_id": v_id,
-            "track_id": int(track_id),
-            "vehicle_type": cls_name,
-            "confidence": round(float(conf), 3),
-            "model_used": self.model_name,
-            "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "scene_image": str(scene_filename.name),
-            "vehicle_image": str(crop_filename.name)
+        # 3. Tra cuu quy dinh phat nguoi theo Nghi dinh 100/123
+        reg_info = config.PENALTY_REGULATIONS.get(cls_name, {
+            "fine_range": "800.000 - 1.000.000 VNĐ",
+            "suspension": "Tước GPLX 1 - 3 tháng",
+            "legal_code": "Nghị định 100/2019/NĐ-CP"
+        })
+
+        # 4. Dong goi Thong bao phat nguoi chuan JSON
+        citation_entry = {
+            "ma_bien_ban": citation_code,
+            "tieu_de": "THÔNG BÁO VI PHẠM TRẬT TỰ AN TOÀN GIAO THÔNG ĐƯỜNG BỘ (PHẠT NGUỘI)",
+            "loai_vi_pham": "Không chấp hành hiệu lệnh của đèn tín hiệu giao thông (Vượt đèn đỏ)",
+            "can_cu_phap_ly": reg_info["legal_code"],
+            "thong_tin_phuong_tien": {
+                "ma_dinh_danh_track_id": int(track_id),
+                "loai_phuong_tien": cls_name,
+                "do_tin_cay_ai": f"{conf * 100:.1f}%",
+                "mo_hinh_nhan_dien": self.model_name
+            },
+            "thoi_gian_dia_diem": {
+                "thoi_diem_ghi_nhan": timestamp_str,
+                "nguon_video": str(Path(self.source_name).name),
+                "khung_hinh_frame": int(frame_idx),
+                "tin_hieu_den": "RED (ĐÈN ĐỎ)",
+                "toa_do_vach_dung": self.stop_line
+            },
+            "muc_xu_phat_du_kien": {
+                "tien_phat": reg_info["fine_range"],
+                "hinh_thuc_bo_sung": reg_info["suspension"],
+                "bien_phap_khac": "Trừ điểm Giấy phép lái xe theo Luật TTATGTĐB mới"
+            },
+            "hinh_anh_bang_chung": {
+                "anh_hien_truong": str(scene_filename.name),
+                "anh_phuong_tien": str(crop_filename.name)
+            },
+            "trang_thai_xu_ly": "ĐÃ LẬP HỒ SƠ - CHỜ GỬI THÔNG BÁO PHẠT NGUỘI"
         }
-        self.violations_log.append(info)
         
-        log_file = self.output_dir / "violations.json"
-        with open(log_file, "w", encoding="utf-8") as f:
+        self.violations_log.append(citation_entry)
+        
+        # Luu file JSON thong bao phat nguoi
+        json_file = self.output_dir / "traffic_citations.json"
+        with open(json_file, "w", encoding="utf-8") as f:
             json.dump(self.violations_log, f, ensure_ascii=False, indent=2)
 
-        print(f"[CANH BAO] PHAT HIEN VUOT DEN DO! ID: {track_id} | Loai xe: {cls_name} | Model: {self.model_name}")
-        return info
+        # Xuat them bao cao Markdown de doc de dang
+        self._export_markdown_report()
+
+        print(f"\n[PHAT NGUOI] {citation_code} | {cls_name} (ID:{track_id}) | Muc phat: {reg_info['fine_range']}")
+        return citation_entry
+
+    def _export_markdown_report(self):
+        """Xuat file bao cao tong hop cac bien ban phat nguoi ra Markdown"""
+        md_file = self.output_dir / "traffic_citations_report.md"
+        lines = [
+            "# 🚨 BÁO CÁO TỔNG HỢP VI PHẠM VƯỢT ĐÈN ĐỎ (PHẠT NGUỘI)",
+            f"*Thời gian xuất báo cáo: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*",
+            f"*Tổng số phương tiện vi phạm ghi nhận: **{len(self.violations_log)}** vụ*",
+            "",
+            "---",
+            "### 📋 Danh sách Biên bản Phạt nguội chi tiết:",
+            ""
+        ]
+
+        for item in self.violations_log:
+            c_code = item["ma_bien_ban"]
+            v_info = item["thong_tin_phuong_tien"]
+            p_info = item["muc_xu_phat_du_kien"]
+            t_info = item["thoi_gian_dia_diem"]
+            e_info = item["hinh_anh_bang_chung"]
+
+            lines.extend([
+                f"#### 📄 Biên bản: `{c_code}`",
+                f"- **Phương tiện:** **{v_info['loai_phuong_tien']}** (ID: `{v_info['ma_dinh_danh_track_id']}`, Độ tin cậy AI: `{v_info['do_tin_cay_ai']}`)",
+                f"- **Thời điểm:** `{t_info['thoi_diem_ghi_nhan']}` (Frame: `{t_info['khung_hinh_frame']}` từ `{t_info['nguon_video']}`)",
+                f"- **Hành vi:** {item['loai_vi_pham']}",
+                f"- **Mức phạt dự kiến:** **{p_info['tien_phat']}** | {p_info['hinh_thuc_bo_sung']}",
+                f"- **Căn cứ:** *{item['can_cu_phap_ly']}*",
+                f"- **Bằng chứng:** Ảnh hiện trường: `{e_info['anh_hien_truong']}` | Ảnh xe: `{e_info['anh_phuong_tien']}`",
+                f"- **Trạng thái:** `{item['trang_thai_xu_ly']}`",
+                "",
+                "---"
+            ])
+
+        with open(md_file, "w", encoding="utf-8") as f:
+            f.write("\n".join(lines))
