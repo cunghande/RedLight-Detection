@@ -21,27 +21,73 @@ CLASS_NAMES_VI = {
 
 CONF_THRESHOLD = 0.35
 
-# ================= CẤU HÌNH VẠCH DỪNG (STOP LINE) =================
-# Tọa độ mặc định: Đặt ở đầu lối vào giao lộ (khoảng y=360), xe vừa chớm vượt là bắt ngay,
-# KHÔNG bị trôi ra giữa ngã tư mới phát hiện!
-DEFAULT_STOP_LINE = [(60, 360), (620, 360)]
+# ================= CẤU HÌNH ĐA VẠCH DỪNG (MULTIPLE STOP LINES) =================
+# Hệ thống hỗ trợ đồng thời nhiều vạch dừng cho các làn đường / hướng di chuyển khác nhau:
+# Mỗi vạch có:
+#   - id: Mã định danh vạch
+#   - name: Tên vạch (ví dụ: Vạch làn xa, Vạch làn gần)
+#   - line: [(x1, y1), (x2, y2)]
+#   - direction: "TOP_TO_BOTTOM" (xe đi từ trên xuống) hoặc "BOTTOM_TO_TOP" (xe đi từ dưới lên)
 
-# Cấu hình vạch dừng tối ưu riêng cho từng video mẫu nếu có:
-VIDEO_STOP_LINES = {
-    "red1.mp4": [(60, 360), (620, 360)],
-    "red2.mp4": [(60, 360), (620, 360)],
-    "demo.mp4": [(230, 480), (1070, 480)],
+DEFAULT_STOP_LINES = [
+    {
+        "id": "line_1",
+        "name": "Vach 1 (Lan xa - Huong tren xuong)",
+        "line": [(30, 420), (590, 420)],   # Ha thap xuong y=420 dung mep vach that
+        "direction": "TOP_TO_BOTTOM"
+    },
+    {
+        "id": "line_2",
+        "name": "Vach 2 (Lan gan - Huong duoi len)",
+        "line": [(50, 715), (720, 715)],   # Vach son trang ro net cua lan duoi
+        "direction": "BOTTOM_TO_TOP"
+    }
+]
+
+# Cấu hình riêng cho từng video:
+VIDEO_STOP_LINES_MAP = {
+    "red1.mp4": [
+        {
+            "id": "line_1",
+            "name": "Vach 1 (Lan xa - Huong tren xuong)",
+            "line": [(30, 420), (590, 420)],
+            "direction": "TOP_TO_BOTTOM"
+        },
+        {
+            "id": "line_2",
+            "name": "Vach 2 (Lan gan - Huong duoi len)",
+            "line": [(50, 715), (720, 715)],
+            "direction": "BOTTOM_TO_TOP"
+        }
+    ],
+    "red2.mp4": [
+        {
+            "id": "line_1",
+            "name": "Vach 1 (Lan xa)",
+            "line": [(30, 420), (590, 420)],
+            "direction": "TOP_TO_BOTTOM"
+        },
+        {
+            "id": "line_2",
+            "name": "Vach 2 (Lan gan)",
+            "line": [(50, 715), (720, 715)],
+            "direction": "BOTTOM_TO_TOP"
+        }
+    ],
+    "demo.mp4": [
+        {
+            "id": "line_1",
+            "name": "Vach dung nga tu",
+            "line": [(230, 480), (1070, 480)],
+            "direction": "TOP_TO_BOTTOM"
+        }
+    ]
 }
 
-def get_stop_line(source_path: str):
-    """Tu dong lay vach dung phu hop voi video hoac dung vach mac dinh"""
+def get_stop_lines(source_path: str):
+    """Tu dong lay danh sach tat ca cac vach dung cho video"""
     name = Path(str(source_path)).name
-    return VIDEO_STOP_LINES.get(name, DEFAULT_STOP_LINE)
-
-# Hướng di chuyển vượt đèn đỏ:
-# "TOP_TO_BOTTOM": xe đi từ trên xuống dưới
-# "BOTTOM_TO_TOP": xe đi từ dưới lên trên
-MOVE_DIRECTION = "TOP_TO_BOTTOM"
+    return VIDEO_STOP_LINES_MAP.get(name, DEFAULT_STOP_LINES)
 
 # ================= CẤU HÌNH ĐÈN TÍN HIỆU =================
 TRAFFIC_LIGHT_ROI = (1120, 100, 60, 150)

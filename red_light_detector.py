@@ -78,17 +78,24 @@ class CentroidTracker:
         return self.objects.copy()
 
 class RedLightViolationDetector:
-    def __init__(self, model_path=config.MODEL_PATH, conf=config.CONF_THRESHOLD, stop_line=None, source_name="video"):
+    def __init__(self, model_path=config.MODEL_PATH, conf=config.CONF_THRESHOLD, stop_lines=None, source_name="video"):
         self.detector = get_detector(model_path)
         self.model_name = self.detector.name
         self.conf = conf
         self.source_name = source_name
         
-        # Lay vach dung theo cau hinh hoac tu dong theo video
-        self.stop_line = stop_line or config.get_stop_line(source_name)
-        self.direction = config.MOVE_DIRECTION
+        # Danh sach cac vach dung (ho tro nhieu vach)
+        raw_lines = stop_lines or config.get_stop_lines(source_name)
+        # Chuan hoa ve danh sach dict neu nguoi dung truyen dang list cu
+        if isinstance(raw_lines, list) and len(raw_lines) > 0 and isinstance(raw_lines[0], tuple):
+            self.stop_lines = [{"id": "line_1", "name": "Vach dung", "line": raw_lines, "direction": config.MOVE_DIRECTION}]
+        else:
+            self.stop_lines = raw_lines
+
         print(f"[INFO] Khoi tao thanh cong voi model: {self.model_name}")
-        print(f"[INFO] Vi tri vach dung Stop Line: {self.stop_line}")
+        print(f"[INFO] He thong dang theo doi {len(self.stop_lines)} vach dung:")
+        for s in self.stop_lines:
+            print(f"   -> {s['name']}: {s['line']} (Huong: {s['direction']})")
         
         self.tracker = CentroidTracker()
         self.previous_positions = {}
@@ -98,8 +105,10 @@ class RedLightViolationDetector:
         self.output_dir = Path(config.OUTPUT_DIR)
         self.output_dir.mkdir(exist_ok=True, parents=True)
 
-    def _is_crossing_line(self, pt_prev, pt_curr):
-        p1, p2 = self.stop_line
+    def _is_crossing_line(self, pt_prev, pt_curr, line_cfg):
+        p1, p2 = line_cfg["line"]
+        direction = line_cfg.get("direction", "TOP_TO_BOTTOM")
+
         def ccw(A, B, C):
             return (C[1] - A[1]) * (B[0] - A[0]) > (B[1] - A[1]) * (C[0] - A[0])
 
@@ -111,12 +120,14 @@ class RedLightViolationDetector:
             x_min = min(p1[0], p2[0]) - 50
             x_max = max(p1[0], p2[0]) + 50
             
-            # Kiem tra xem xe co di qua vung x cua vach dung khong
+            # Kiem tra trong khoang chieu ngang cua vach
             if x_min <= pt_curr[0] <= x_max:
-                if self.direction == "TOP_TO_BOTTOM":
+                if direction == "TOP_TO_BOTTOM":
                     line_intersect = (pt_prev[1] <= y_line and pt_curr[1] > y_line)
-                else:
+                elif direction == "BOTTOM_TO_TOP":
                     line_intersect = (pt_prev[1] >= y_line and pt_curr[1] < y_line)
+                else:
+                    line_intersect = abs(pt_prev[1] - y_line) <= 15 and abs(pt_curr[1] - y_line) <= 15
         return line_intersect
 
     def process_frame(self, frame, traffic_state: str, frame_idx: int = 0):
@@ -129,17 +140,21 @@ class RedLightViolationDetector:
         line_color = (0, 0, 255) if traffic_state == "RED" else (
             (0, 255, 255) if traffic_state == "YELLOW" else (0, 255, 0)
         )
-        p1, p2 = self.stop_line
-        cv2.line(annotated_frame, p1, p2, line_color, 4)
-        cv2.putText(
-            annotated_frame,
-            "VACH DUNG (STOP LINE)",
-            (p1[0], max(30, p1[1] - 10)),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.6,
-            line_color,
-            2
-        )
+
+        # Ve tat ca cac vach dung tren khung hinh
+        for s_idx, s_cfg in enumerate(self.stop_lines):
+            p1, p2 = s_cfg["line"]
+            cv2.line(annotated_frame, p1, p2, line_color, 4)
+            label_text = f"{s_cfg['name']}"
+            cv2.putText(
+                annotated_frame,
+                label_text,
+                (p1[0], max(25, p1[1] - 8)),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.55,
+                line_color,
+                2
+            )
 
         if len(boxes) > 0:
             tracked_objects = self.tracker.update(boxes)
@@ -162,20 +177,25 @@ class RedLightViolationDetector:
                 track_id = matched_id if matched_id is not None else (i + 1)
                 is_violation = track_id in self.violated_ids
 
+                # Kiem tra cat qua bat ky vach dung nao
                 if not is_violation and track_id in self.previous_positions:
                     prev_pt = self.previous_positions[track_id]
-                    if traffic_state == "RED" and self._is_crossing_line(prev_pt, curr_pt):
-                        is_violation = True
-                        self.violated_ids.add(track_id)
-                        violation_info = self._record_violation(
-                            frame=frame,
-                            box=box,
-                            track_id=track_id,
-                            cls_name=cls_name,
-                            conf=float(conf),
-                            frame_idx=frame_idx
-                        )
-                        current_violations.append(violation_info)
+                    if traffic_state == "RED":
+                        for s_cfg in self.stop_lines:
+                            if self._is_crossing_line(prev_pt, curr_pt, s_cfg):
+                                is_violation = True
+                                self.violated_ids.add(track_id)
+                                violation_info = self._record_violation(
+                                    frame=frame,
+                                    box=box,
+                                    track_id=track_id,
+                                    cls_name=cls_name,
+                                    conf=float(conf),
+                                    frame_idx=frame_idx,
+                                    line_cfg=s_cfg
+                                )
+                                current_violations.append(violation_info)
+                                break
 
                 self.previous_positions[track_id] = curr_pt
 
@@ -210,10 +230,10 @@ class RedLightViolationDetector:
 
         return annotated_frame, current_violations
 
-    def _record_violation(self, frame, box, track_id, cls_name, conf, frame_idx):
+    def _record_violation(self, frame, box, track_id, cls_name, conf, frame_idx, line_cfg):
         timestamp_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        file_ts = datetime.now().strftime("%Y%m%d_%H%M%S")
         citation_code = f"PN-{datetime.now().strftime('%Y%m%d')}-{track_id:04d}"
+        line_name = line_cfg.get("name", "Vach dung")
         
         # 1. Luu anh hien truong toan canh
         scene_filename = self.output_dir / f"{citation_code}_scene.jpg"
@@ -222,10 +242,10 @@ class RedLightViolationDetector:
         cv2.rectangle(scene_img, (x1, y1), (x2, y2), (0, 0, 255), 3)
         cv2.putText(
             scene_img,
-            f"BIEN BAN PHAT NGUOI: {citation_code} - {cls_name} ID:{track_id}",
+            f"BIEN BAN PHAT NGUOI: {citation_code} - {cls_name} ID:{track_id} tai {line_name}",
             (x1, max(30, y1 - 10)),
             cv2.FONT_HERSHEY_SIMPLEX,
-            0.65,
+            0.6,
             (0, 0, 255),
             2
         )
@@ -255,6 +275,7 @@ class RedLightViolationDetector:
             "tieu_de": "THÔNG BÁO VI PHẠM TRẬT TỰ AN TOÀN GIAO THÔNG ĐƯỜNG BỘ (PHẠT NGUỘI)",
             "loai_vi_pham": "Không chấp hành hiệu lệnh của đèn tín hiệu giao thông (Vượt đèn đỏ)",
             "can_cu_phap_ly": reg_info["legal_code"],
+            "vach_vi_pham": line_name,
             "thong_tin_phuong_tien": {
                 "ma_dinh_danh_track_id": int(track_id),
                 "loai_phuong_tien": cls_name,
@@ -266,7 +287,7 @@ class RedLightViolationDetector:
                 "nguon_video": str(Path(self.source_name).name),
                 "khung_hinh_frame": int(frame_idx),
                 "tin_hieu_den": "RED (ĐÈN ĐỎ)",
-                "toa_do_vach_dung": self.stop_line
+                "toa_do_vach_vi_pham": line_cfg["line"]
             },
             "muc_xu_phat_du_kien": {
                 "tien_phat": reg_info["fine_range"],
@@ -277,7 +298,11 @@ class RedLightViolationDetector:
                 "anh_hien_truong": str(scene_filename.name),
                 "anh_phuong_tien": str(crop_filename.name)
             },
-            "trang_thai_xu_ly": "ĐÃ LẬP HỒ SƠ - CHỜ GỬI THÔNG BÁO PHẠT NGUỘI"
+            "trang_thai_xu_ly": "ĐÃ LẬP HỒ SƠ - CHỜ GỬI THÔNG BÁO PHẠT NGUỘI",
+            # Shortcut fields cho giao dien
+            "track_id": int(track_id),
+            "vehicle_type": cls_name,
+            "time": timestamp_str
         }
         
         self.violations_log.append(citation_entry)
@@ -290,7 +315,7 @@ class RedLightViolationDetector:
         # Xuat them bao cao Markdown de doc de dang
         self._export_markdown_report()
 
-        print(f"\n[PHAT NGUOI] {citation_code} | {cls_name} (ID:{track_id}) | Muc phat: {reg_info['fine_range']}")
+        print(f"\n[PHAT NGUOI] {citation_code} | {cls_name} (ID:{track_id}) | Tai: {line_name} | Phat: {reg_info['fine_range']}")
         return citation_entry
 
     def _export_markdown_report(self):
@@ -312,10 +337,12 @@ class RedLightViolationDetector:
             p_info = item["muc_xu_phat_du_kien"]
             t_info = item["thoi_gian_dia_diem"]
             e_info = item["hinh_anh_bang_chung"]
+            line_name = item.get("vach_vi_pham", "Vạch dừng")
 
             lines.extend([
                 f"#### 📄 Biên bản: `{c_code}`",
                 f"- **Phương tiện:** **{v_info['loai_phuong_tien']}** (ID: `{v_info['ma_dinh_danh_track_id']}`, Độ tin cậy AI: `{v_info['do_tin_cay_ai']}`)",
+                f"- **Địa điểm vi phạm:** **{line_name}**",
                 f"- **Thời điểm:** `{t_info['thoi_diem_ghi_nhan']}` (Frame: `{t_info['khung_hinh_frame']}` từ `{t_info['nguon_video']}`)",
                 f"- **Hành vi:** {item['loai_vi_pham']}",
                 f"- **Mức phạt dự kiến:** **{p_info['tien_phat']}** | {p_info['hinh_thuc_bo_sung']}",
