@@ -5,34 +5,22 @@ from pathlib import Path
 
 class AutoStopLineDetector:
     """
-    Module tu dong phat hien vach dung den do / vach son mat duong (Autonomous Stop Line Detector)
-    su dung thi giac may tinh & xu ly anh da khung hinh:
-    - Thu thap bo loc da khung hinh (Median Temporal Filter) de loai bo xe dang di chuyen, giu lai mat duong tinh.
-    - Trich xuat vung mat duong (Road ROI) & dac trung vach son trang (HSV White Filter + Top-Hat Morphology).
-    - Trich xuat cac duong nam ngang (Horizontal Morphological Opening + Hough Line Transform).
-    - Gom nhom cum toa do Y va cham diem do tin cay (Length, Span, Continuity Score).
-    - Tra ve toa do [(x1, y1), (x2, y2)] thuc te cua video, khong phu thuoc vao bat ky toa do mac dinh nao!
+    Module tu dong phat hien vach dung den do / vach sang duong tren mat duong (Autonomous Stop Line Detector)
+    su dung thi giac may tinh & xu ly anh:
+    - Thu thap anh mat duong bang phep loc trung vi da khung hinh (Median Temporal Filter) loai bo xe di chuyen.
+    - Xac dinh vung mat duong hoat dong (Active Road Surface ROI, y: 46% -> 82% H) loai bo ho lan, cay coi, watermark.
+    - Trich xuat vach son trang bang nguong thich nghi do sang mat duong (Adaptive Road Brightness Percentile).
+    - Trich xuat duong nam ngang: Hough Line Transform voi rang buoc chat che (|dy| <= 16px, do doc |dy/dx| < 0.08).
+    - Gom nhom cum Y va danh gia do tin cay (Span & Total Paint Density).
+    - Mac dinh chi lay DUY NHAT 1 vach dung chinh thuc te. Khong tu y them vach 2 neu video chi co 1 vach!
+    - Vach duoc ke nam ngang thang tap theo mat duong, khong lech cheo hay nghieng dốc.
     """
 
-    def __init__(self, num_samples=12, max_lines=2):
+    def __init__(self, num_samples=10, max_lines=1):
         self.num_samples = num_samples
         self.max_lines = max_lines
 
     def detect_from_video(self, video_source, max_lines=None):
-        """
-        Nhan vao duong dan file video hoac doi tuong cv2.VideoCapture.
-        Tra ve danh sach cac vach dung tu dong duoc phat hien:
-        [
-            {
-                'id': 'line_1',
-                'name': 'Vach 1 (Tu dong nhan dien)',
-                'line': [(x1, y1), (x2, y2)],
-                'direction': 'TOP_TO_BOTTOM' hoac 'BOTTOM_TO_TOP',
-                'confidence': float
-            }, ...
-        ]
-        Neu video khong co vach son mat duong, tra ve [] (danh sach rong).
-        """
         if max_lines is None:
             max_lines = self.max_lines
 
@@ -52,7 +40,7 @@ class AutoStopLineDetector:
         if total_frames <= 0:
             total_frames = 100
 
-        max_sample_range = min(total_frames - 1, 120)
+        max_sample_range = min(total_frames - 1, 100)
         sample_indices = np.linspace(0, max_sample_range, self.num_samples, dtype=int)
 
         frames = []
@@ -62,8 +50,7 @@ class AutoStopLineDetector:
             ret, frame = cap.read()
             if ret:
                 frames.append(frame)
-                
-        # Tra lai vi tri frame ban dau
+
         cap.set(cv2.CAP_PROP_POS_FRAMES, original_pos)
         if should_release:
             cap.release()
@@ -75,41 +62,31 @@ class AutoStopLineDetector:
 
         # 2. Trich xuat anh nen mat duong bang phep loc Median (loai bo phuong tien dang chay)
         if len(frames) >= 5:
-            road_background = np.median(frames[:8], axis=0).astype(np.uint8)
+            road_background = np.median(frames[:7], axis=0).astype(np.uint8)
         else:
             road_background = frames[0]
 
-        # 3. Vung quan tam mat duong (Road ROI: tu 35% den 92% chieu cao khung hinh)
-        roi_top = int(H * 0.35)
-        roi_bottom = int(H * 0.92)
+        # 3. Vung mat duong hoat dong: tu 46% den 82% chieu cao khung hinh
+        roi_top = int(H * 0.46)
+        roi_bottom = int(H * 0.82)
         roi = road_background[roi_top:roi_bottom, :]
 
         gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
-        hsv = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
 
-        # 4. Trich xuat vach son trang:
-        # 4.1. Bo loc mau trang HSV (Saturation thap, Brightness cao)
-        lower_white = np.array([0, 0, 130])
-        upper_white = np.array([180, 70, 255])
-        mask_white = cv2.inRange(hsv, lower_white, upper_white)
+        # 4. Trich xuat vach son trang bang nguong do sang thich nghi mat duong
+        th_val = max(115, int(np.percentile(gray, 85)))
+        _, bin_mask = cv2.threshold(gray, th_val, 255, cv2.THRESH_BINARY)
 
-        # 4.2. Phep bien doi Top-hat tren Grayscale (nhan dien vach son sang tren nen duong toi)
-        tophat_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (17, 5))
-        tophat = cv2.morphologyEx(gray, cv2.MORPH_TOPHAT, tophat_kernel)
-        _, mask_tophat = cv2.threshold(tophat, 28, 255, cv2.THRESH_BINARY)
-
-        combined_mask = cv2.bitwise_or(mask_white, mask_tophat)
-
-        # 5. Bo loc hinh thai hoc chieu ngang (Horizontal Opening) de loai bo vach doc va hat nhieu
+        # 5. Bo loc hinh thai hoc chieu ngang (Horizontal Opening)
         kernel_horiz = cv2.getStructuringElement(cv2.MORPH_RECT, (25, 3))
-        clean_mask = cv2.morphologyEx(combined_mask, cv2.MORPH_OPEN, kernel_horiz)
+        clean_mask = cv2.morphologyEx(bin_mask, cv2.MORPH_OPEN, kernel_horiz)
 
         # 6. Phat hien cac doan thang bang HoughLinesP
-        lines = cv2.HoughLinesP(clean_mask, 1, np.pi / 180, threshold=40, minLineLength=35, maxLineGap=25)
+        lines = cv2.HoughLinesP(clean_mask, 1, np.pi / 180, threshold=35, minLineLength=35, maxLineGap=30)
         if lines is None:
             return []
 
-        # 7. Loc cac doan thang nam ngang (slope |dx| > 2.0 * |dy|)
+        # 7. Loc nghiem ngat: Vach dung phai hoan toan nam ngang
         horizontal_segments = []
         for l in lines:
             if len(l) == 4 and not hasattr(l[0], '__len__'):
@@ -119,8 +96,12 @@ class AutoStopLineDetector:
 
             dx = abs(x2 - x1)
             dy = abs(y2 - y1)
-            if dx > 2.0 * dy and dx >= 30:
-                # Quy doi toa do ve khung hinh goc
+
+            # RANG BUOC CHAT CHE:
+            # - dx >= 35 pixel
+            # - dy <= 16 pixel (khong lech qua 16 pixel doc)
+            # - do doc |dy/dx| < 0.08 (< 4.5 do) -> tuyet doi khong bao gio bi cheo dốc!
+            if dx >= 35 and dy <= 16 and (dy / max(1, dx)) < 0.08:
                 horizontal_segments.append((min(x1, x2), y1 + roi_top, max(x1, x2), y2 + roi_top, dx))
 
         if not horizontal_segments:
@@ -128,85 +109,88 @@ class AutoStopLineDetector:
 
         # 8. Gom nhom cac doan thang theo truc Y (Clustering)
         clusters = []
-        for x1, y1, x2, y2, length in horizontal_segments:
+        for x1, y1, x2, y2, dx in horizontal_segments:
             y_mid = (y1 + y2) / 2
             matched = False
             for c in clusters:
-                if abs(c['y_mid'] - y_mid) < 35:
-                    c['lines'].append((x1, y1, x2, y2, length))
-                    c['y_mid'] = np.mean([(it[1] + it[3]) / 2 for it in c['lines']])
+                if abs(c['ym'] - y_mid) < 40:
+                    c['lines'].append((x1, y1, x2, y2, dx))
+                    c['ym'] = np.mean([(it[1] + it[3]) / 2 for it in c['lines']])
                     matched = True
                     break
             if not matched:
-                clusters.append({'y_mid': y_mid, 'lines': [(x1, y1, x2, y2, length)]})
+                clusters.append({'ym': y_mid, 'lines': [(x1, y1, x2, y2, dx)]})
 
-        # 9. Cham diem va tinh toan duong thang khop (Line Fitting & Scoring)
-        candidates = []
+        # 9. Cham diem tung cum vach
+        scored_clusters = []
         for c in clusters:
             min_x = min(it[0] for it in c['lines'])
             max_x = max(it[2] for it in c['lines'])
             span_x = max_x - min_x
             tot_len = sum(it[4] for it in c['lines'])
 
-            # Vach dung thuc te phai trai rong qua cac lan duong (span it nhat 20% chieu rong)
-            if span_x < W * 0.20 and tot_len < W * 0.18:
-                continue
+            # Vach dung thuc te phai trai rong it nhat 22% chieu rong man hinh
+            if span_x >= W * 0.22:
+                avg_y = int(round(c['ym']))
 
-            # Hoi quy tuyen tinh de tao duong thang lien mach
-            pts_x, pts_y = [], []
-            for it in c['lines']:
-                pts_x.extend([it[0], it[2]])
-                pts_y.extend([it[1], it[3]])
-            fit = np.polyfit(pts_x, pts_y, 1)
-            y_start = int(fit[0] * min_x + fit[1])
-            y_end = int(fit[0] * max_x + fit[1])
+                # Lam phang vach nam ngang theo mat duong (do lech dy toi da <= 6px)
+                slopes = [(it[3] - it[1]) / max(1, it[2] - it[0]) for it in c['lines']]
+                med_slope = float(np.median(slopes)) if slopes else 0.0
+                med_slope = max(-0.02, min(0.02, med_slope))
 
-            # Tinh diem tin cay: Do rong span + Tong chieu dai cac phan tu vach
-            score = (span_x / W) * 1.5 + (tot_len / W)
-            candidates.append({
-                'score': score,
-                'y_mid': c['y_mid'],
-                'line': [(int(min_x), y_start), (int(max_x), y_end)],
-                'span': span_x
-            })
+                x_mid = (min_x + max_x) / 2
+                y1 = int(round(avg_y + med_slope * (min_x - x_mid)))
+                y2 = int(round(avg_y + med_slope * (max_x - x_mid)))
 
-        if not candidates:
+                if abs(y2 - y1) > 8:
+                    y2 = y1
+
+                score = span_x * 2.0 + tot_len
+                scored_clusters.append({
+                    'score': score,
+                    'ym': avg_y,
+                    'span': span_x,
+                    'tot_l': tot_len,
+                    'line': [(int(min_x), y1), (int(max_x), y2)]
+                })
+
+        if not scored_clusters:
             return []
 
-        # Sap xep theo do tin cay cao nhat
-        candidates.sort(key=lambda item: item['score'], reverse=True)
+        # Sap xep theo do tin cay (score) giam dan
+        scored_clusters.sort(key=lambda x: x['score'], reverse=True)
 
-        # Chon toi da `max_lines` vach co score cao nhat va cach xa nhau it nhat 70px
-        selected = []
-        for cand in candidates:
-            if len(selected) >= max_lines:
-                break
-            if not selected or all(abs(cand['y_mid'] - s['y_mid']) > 70 for s in selected):
-                selected.append(cand)
+        # 10. XAC DINH CHINH XAC SO LUONG VACH (Mac dinh 1 vach duy nhat)
+        primary = scored_clusters[0]
+        final_lines = [primary]
 
-        # Sap xep lai theo thu tu tu tren xuong duoi (Y tang dan)
-        selected.sort(key=lambda item: item['y_mid'])
+        # Chi them vach 2 neu nguoi dung cho phep (max_lines >= 2) VA thuc su co vach 2
+        # o phia doi dien cua nga tu (cach xa it nhat 220px, span >= 35%W, score >= 85% vach 1)
+        if max_lines >= 2:
+            for cand in scored_clusters[1:]:
+                if abs(cand['ym'] - primary['ym']) >= 220 and cand['span'] >= W * 0.35 and cand['score'] >= 0.85 * primary['score']:
+                    final_lines.append(cand)
+                    break
 
-        # Tao danh sach cau hinh vach dung chuan
+        final_lines.sort(key=lambda x: x['ym'])
+
         detected_stop_lines = []
-        for i, s in enumerate(selected):
-            y_avg = s['y_mid']
-            # Huong di chuyen: vach nua tren ngã tư thiet lap TOP_TO_BOTTOM, nua duoi BOTTOM_TO_TOP
+        for i, s in enumerate(final_lines):
+            y_avg = s['ym']
             direction = 'TOP_TO_BOTTOM' if y_avg < H * 0.55 else 'BOTTOM_TO_TOP'
-            name_desc = f"Vach {i+1} (Tu dong phat hien - Y={int(y_avg)})"
+            name_desc = "Vach dung" if len(final_lines) == 1 else f"Vach {i+1}"
             
             detected_stop_lines.append({
                 'id': f'auto_line_{i+1}',
-                'name': name_desc,
+                'name': f"{name_desc} (Y={int(y_avg)})",
                 'line': s['line'],
                 'direction': direction,
-                'score': float(round(s['score'], 2))
+                'score': float(round(s['score'], 1))
             })
 
         return detected_stop_lines
 
 
-# Ham tien ich de goi nhanh
-def get_auto_stop_lines(video_path, max_lines=2):
+def get_auto_stop_lines(video_path, max_lines=1):
     detector = AutoStopLineDetector(max_lines=max_lines)
     return detector.detect_from_video(video_path)

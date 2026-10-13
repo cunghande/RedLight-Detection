@@ -1,29 +1,29 @@
 [
   {
-    "ma_bien_ban": "PN-20261013-0026",
+    "ma_bien_ban": "PN-20261013-0007",
     "tieu_de": "THÔNG BÁO VI PHẠM TRẬT TỰ AN TOÀN GIAO THÔNG ĐƯỜNG BỘ (PHẠT NGUỘI)",
     "loai_vi_pham": "Không chấp hành hiệu lệnh của đèn tín hiệu giao thông (Vượt đèn đỏ)",
     "can_cu_phap_ly": "Điểm a Khoản 5 Điều 5 NĐ 100/2019/NĐ-CP (sửa đổi NĐ 123/2021)",
-    "vach_vi_pham": "Vach 2 (Tu dong phat hien - Y=584)",
+    "vach_vi_pham": "Vach 1 (Tu dong phat hien - Y=678)",
     "thong_tin_phuong_tien": {
-      "ma_dinh_danh_track_id": 26,
+      "ma_dinh_danh_track_id": 7,
       "loai_phuong_tien": "O to",
-      "do_tin_cay_ai": "85.7%",
+      "do_tin_cay_ai": "56.6%",
       "mo_hinh_nhan_dien": "YOLO (yolov8s.pt)"
     },
     "thoi_gian_dia_diem": {
-      "thoi_diem_ghi_nhan": "2026-10-13 21:56:10",
-      "nguon_video": "red2.mp4",
-      "khung_hinh_frame": 107,
+      "thoi_diem_ghi_nhan": "2026-10-13 22:02:28",
+      "nguon_video": "red3.mp4",
+      "khung_hinh_frame": 82,
       "tin_hieu_den": "RED (ĐÈN ĐỎ)",
       "toa_do_vach_vi_pham": [
         [
           0,
-          570
+          519
         ],
         [
-          1067,
-          594
+          1077,
+          838
         ]
       ]
     },
@@ -33,12 +33,96 @@
       "bien_phap_khac": "Trừ điểm Giấy phép lái xe theo Luật TTATGTĐB mới"
     },
     "hinh_anh_bang_chung": {
-      "anh_hien_truong": "PN-20261013-0026_scene.jpg",
-      "anh_phuong_tien": "PN-20261013-0026_vehicle.jpg"
+      "anh_hien_truong": "PN-20261013-0007_scene.jpg",
+      "anh_phuong_tien": "PN-20261013-0007_vehicle.jpg"
     },
     "trang_thai_xu_ly": "ĐÃ LẬP HỒ SƠ - CHỜ GỬI THÔNG BÁO PHẠT NGUỘI",
-    "track_id": 26,
+    "track_id": 7,
     "vehicle_type": "O to",
-    "time": "2026-10-13 21:56:10"
+    "time": "2026-10-13 22:02:28"
+  },
+  {
+    "ma_bien_ban": "PN-20261013-0012",
+    "tieu_de": "THÔNG BÁO VI PHẠM TRẬT TỰ AN TOÀN GIAO THÔNG ĐƯỜNG BỘ (PHẠT NGUỘI)",
+    "loai_vi_pham": "Không chấp hành hiệu lệnh của đèn tín hiệu giao thông (Vượt đèn đỏ)",
+    "can_cu_phap_ly": "Nghị định 100/2019/NĐ-CP",
+    "vach_vi_pham": "Vach 1 (Tu dong phat hien - Y=678)",
+    "thong_tin_phuong_tien": {
+      "ma_dinh_danh_track_id": 12,
+      "loai_phuong_tien": "Nguoi",
+      "do_tin_cay_ai": "72.1%",
+      "mo_hinh_nhan_dien": "YOLO (yolov8s.pt)"
+    },
+    "thoi_gian_dia_diem": {
+      "thoi_diem_ghi_nhan": "2026-10-13 22:02:51",
+      "nguon_video": "red3.mp4",
+      "khung_hinh_frame": 192,
+      "tin_hieu_den": "RED (ĐÈN ĐỎ)",
+      "toa_do_vach_vi_pham": [
+        [
+          0,
+          519
+        ],
+        [
+          1077,
+          838
+        ]
+      ]
+    },
+    "muc_xu_phat_du_kien": {
+      "tien_phat": "800.000 - 1.000.000 VNĐ",
+      "hinh_thuc_bo_sung": "Tước GPLX 1 - 3 tháng",
+      "bien_phap_khac": "Trừ điểm Giấy phép lái xe theo Luật TTATGTĐB mới"
+    },
+    "hinh_anh_bang_chung": {
+      "anh_hien_truong": "PN-20261013-0012_scene.jpg",
+      "anh_phuong_tien": "PN-20261013-0012_vehicle.jpg"
+    },
+    "trang_thai_xu_ly": "ĐÃ LẬP HỒ SƠ - CHỜ GỬI THÔNG BÁO PHẠT NGUỘI",
+    "track_id": 12,
+    "vehicle_type": "Nguoi",
+    "time": "2026-10-13 22:02:51"
+  },
+  {
+    "ma_bien_ban": "PN-20261013-0014",
+    "tieu_de": "THÔNG BÁO VI PHẠM TRẬT TỰ AN TOÀN GIAO THÔNG ĐƯỜNG BỘ (PHẠT NGUỘI)",
+    "loai_vi_pham": "Không chấp hành hiệu lệnh của đèn tín hiệu giao thông (Vượt đèn đỏ)",
+    "can_cu_phap_ly": "Điểm đ Khoản 2 Điều 8 NĐ 100/2019/NĐ-CP",
+    "vach_vi_pham": "Vach 1 (Tu dong phat hien - Y=678)",
+    "thong_tin_phuong_tien": {
+      "ma_dinh_danh_track_id": 14,
+      "loai_phuong_tien": "Xe dap",
+      "do_tin_cay_ai": "88.5%",
+      "mo_hinh_nhan_dien": "YOLO (yolov8s.pt)"
+    },
+    "thoi_gian_dia_diem": {
+      "thoi_diem_ghi_nhan": "2026-10-13 22:02:51",
+      "nguon_video": "red3.mp4",
+      "khung_hinh_frame": 195,
+      "tin_hieu_den": "RED (ĐÈN ĐỎ)",
+      "toa_do_vach_vi_pham": [
+        [
+          0,
+          519
+        ],
+        [
+          1077,
+          838
+        ]
+      ]
+    },
+    "muc_xu_phat_du_kien": {
+      "tien_phat": "100.000 - 200.000 VNĐ",
+      "hinh_thuc_bo_sung": "Không áp dụng",
+      "bien_phap_khac": "Trừ điểm Giấy phép lái xe theo Luật TTATGTĐB mới"
+    },
+    "hinh_anh_bang_chung": {
+      "anh_hien_truong": "PN-20261013-0014_scene.jpg",
+      "anh_phuong_tien": "PN-20261013-0014_vehicle.jpg"
+    },
+    "trang_thai_xu_ly": "ĐÃ LẬP HỒ SƠ - CHỜ GỬI THÔNG BÁO PHẠT NGUỘI",
+    "track_id": 14,
+    "vehicle_type": "Xe dap",
+    "time": "2026-10-13 22:02:51"
   }
 ]
