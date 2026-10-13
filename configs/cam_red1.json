@@ -1,0 +1,25 @@
+{
+  "camera_id": "cam_red1",
+  "source_video": "dataset_videos\\red1.mp4",
+  "detector_mode": "classical",
+  "total_lines": 1,
+  "lines": [
+    {
+      "id": "stop_line_1",
+      "name": "Vach dung (Y=558)",
+      "line": [
+        [
+          189,
+          569
+        ],
+        [
+          1035,
+          569
+        ]
+      ],
+      "direction": "TOP_TO_BOTTOM",
+      "confidence": 1.0,
+      "method": "classical_median_hough"
+    }
+  ]
+}

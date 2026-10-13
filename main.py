@@ -1,190 +1,260 @@
 import argparse
-import sys
-import time
+import logging
 from pathlib import Path
+import time
+from typing import Optional
+
 import cv2
+import numpy as np
+import yaml
 
-import config
-from traffic_light import TrafficLightDetector
-from red_light_detector import RedLightViolationDetector
+from src.camera_stabilizer import CameraStabilizer
+from src.report_generator import ReportGenerator
+from src.stopline_detector import StopLineDetector
+from src.traffic_light_detector import TrafficLightDetector
+from src.violation_engine import ViolationEngine
 
-def draw_hud(frame, traffic_state, total_violations, fps, recent_violations):
-    """Ve giao dien thong tin (HUD Dashboard) hien dai, truc quan len video"""
+logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(message)s")
+logger = logging.getLogger("TrafficSystem")
+
+
+def load_yaml_config(config_path: str = "config.yaml") -> dict:
+    p = Path(config_path)
+    if p.exists():
+        with open(p, "r", encoding="utf-8") as f:
+            return yaml.safe_load(f) or {}
+    return {}
+
+
+def draw_hud(
+    frame: np.ndarray,
+    traffic_state: str,
+    total_violations: int,
+    fps: float,
+    stop_lines_info: str,
+    camera_id: str
+):
+    """Vẽ bảng điều khiển HUD thông tin trực quan ở góc trên"""
     h, w = frame.shape[:2]
-    
-    # 1. Thanh Top Bar thong so tren cung
+
+    # Panel nền tối kính mờ ở góc trên
+    panel_h = 55
     overlay = frame.copy()
-    cv2.rectangle(overlay, (0, 0), (w, 55), (15, 15, 15), -1)
+    cv2.rectangle(overlay, (0, 0), (w, panel_h), (18, 18, 18), -1)
     cv2.addWeighted(overlay, 0.75, frame, 0.25, 0, frame)
-    cv2.line(frame, (0, 55), (w, 55), (60, 60, 60), 1)
 
-    # Tieu de he thong
-    cv2.putText(frame, "AI RED LIGHT VIOLATION SYSTEM", (20, 36),
-                cv2.FONT_HERSHEY_DUPLEX, 0.75, (0, 220, 255), 2)
+    # 1. Tiêu đề
+    cv2.putText(frame, "AI RED LIGHT SYSTEM", (15, 34), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (0, 215, 255), 2)
 
-    # Trang thai den giao thong
-    state_color = (0, 0, 255) if traffic_state == "RED" else (
-        (0, 255, 255) if traffic_state == "YELLOW" else (0, 255, 0)
-    )
-    cv2.putText(frame, "TIN HIEU DEN:", (460, 36),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.65, (220, 220, 220), 1)
-    cv2.putText(frame, traffic_state, (610, 37),
-                cv2.FONT_HERSHEY_DUPLEX, 0.75, state_color, 2)
-    cv2.circle(frame, (735, 30), 12, state_color, -1)
-    cv2.circle(frame, (735, 30), 12, (255, 255, 255), 1)
+    # 2. Camera ID & Vạch dừng
+    cv2.putText(frame, f"CAM: {camera_id} | {stop_lines_info}", (270, 34), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (220, 220, 220), 1)
 
-    # Tong so vi pham
-    cv2.putText(frame, "TONG VI PHAM:", (780, 36),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.65, (220, 220, 220), 1)
-    cv2.putText(frame, str(total_violations), (950, 37),
-                cv2.FONT_HERSHEY_DUPLEX, 0.8, (0, 0, 255) if total_violations > 0 else (0, 255, 0), 2)
+    # 3. Đèn tín hiệu giao thông
+    state_colors = {
+        "RED": (0, 0, 255),
+        "YELLOW": (0, 255, 255),
+        "GREEN": (0, 255, 0)
+    }
+    cur_color = state_colors.get(traffic_state, (0, 255, 0))
+    cv2.circle(frame, (w - 280, 27), 10, cur_color, -1)
+    cv2.putText(frame, f"DEN: {traffic_state}", (w - 260, 34), cv2.FONT_HERSHEY_SIMPLEX, 0.55, cur_color, 2)
 
-    # FPS
-    cv2.putText(frame, f"FPS: {fps:.1f}", (w - 140, 36),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (180, 180, 180), 1)
+    # 4. Tổng vi phạm
+    cv2.putText(frame, f"VI PHAM: {total_violations}", (w - 140, 34), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 0, 255) if total_violations > 0 else (255, 255, 255), 2)
 
-    # 2. Bang canh bao vi pham moi nhat o goc duoi ben trai
-    if recent_violations:
-        panel_w, panel_h = 360, min(160, 35 + len(recent_violations) * 30)
-        panel_x, panel_y = 20, h - panel_h - 20
-        
-        cv2.rectangle(overlay, (panel_x, panel_y), (panel_x + panel_w, panel_y + panel_h), (10, 10, 10), -1)
-        cv2.addWeighted(overlay, 0.8, frame, 0.2, 0, frame)
-        cv2.rectangle(frame, (panel_x, panel_y), (panel_x + panel_w, panel_y + panel_h), (0, 0, 255), 2)
-        
-        cv2.putText(frame, "DANH SACH VI PHAM GAN NHAT", (panel_x + 12, panel_y + 24),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 100, 255), 2)
-        
-        for i, viol in enumerate(reversed(recent_violations[-4:])):
-            tid = viol.get("track_id") or viol.get("thong_tin_phuong_tien", {}).get("ma_dinh_danh_track_id", "?")
-            vtype = viol.get("vehicle_type") or viol.get("thong_tin_phuong_tien", {}).get("loai_phuong_tien", "Xe")
-            vcode = viol.get("ma_bien_ban", f"ID:{tid}")
-            txt = f"[!] {vcode}: {vtype}"
-            cv2.putText(frame, txt, (panel_x + 12, panel_y + 52 + i * 26),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.48, (255, 255, 255), 1)
 
-def run_detection(source, output_video=None, model_path=config.MODEL_PATH, headless=False, auto_detect_lines=True):
-    # Kiem tra nguon video (so camera hoac file path)
-    if str(source).isdigit():
-        source = int(source)
-    else:
-        source_path = Path(source)
-        if not source_path.exists():
-            print(f"[CANH BAO] File video '{source}' khong ton tai. Dang tao video demo mau...")
-            from generate_demo_video import create_traffic_demo
-            create_traffic_demo(output_path=str(source))
+def run_pipeline(
+    video_source: str,
+    camera_id: str = "cam_01",
+    mode: str = "classical",
+    redetect: bool = False,
+    output_video: Optional[str] = "output_violation.mp4",
+    stabilize: bool = False,
+    headless: bool = False
+):
+    cfg = load_yaml_config("config.yaml")
 
-    cap = cv2.VideoCapture(source)
+    # Mở nguồn video
+    cap = cv2.VideoCapture(int(video_source) if str(video_source).isdigit() else str(video_source))
     if not cap.isOpened():
-        print(f"[LOI] Khong the mo nguon video: {source}")
+        logger.error(f"Không thể mở nguồn video: {video_source}")
         return
 
-    # Khoi tao bo phat hien den & bo phat hien vi pham
-    tl_detector = TrafficLightDetector(
-        mode=config.TRAFFIC_LIGHT_MODE,
-        roi=config.TRAFFIC_LIGHT_ROI,
-        timer_cycle=config.TIMER_CYCLE
-    )
-    detector = RedLightViolationDetector(
-        model_path=model_path,
-        source_name=str(source),
-        auto_detect_lines=auto_detect_lines
+    # 1. KHỞI TẠO BỘ PHÁT HIỆN VẠCH DỪNG (CHẠY 1 LẦN HOẶC ĐỌC CACHE)
+    line_detector = StopLineDetector(config_path="config.yaml")
+    stop_lines = line_detector.detect(video_source, camera_id=camera_id, mode=mode, redetect=redetect)
+
+    if not stop_lines:
+        logger.error(f"[LỖI] Không thể phát hiện hoặc đọc vạch dừng cho video: {video_source}")
+        return
+
+    # 2. KHỞI TẠO BỘ CHỐNG RUNG CAMERA
+    stabilizer = CameraStabilizer(
+        enabled=stabilize or cfg.get("camera", {}).get("stabilization_enabled", False),
+        method=cfg.get("stabilization", {}).get("method", "ORB"),
+        max_features=cfg.get("stabilization", {}).get("max_features", 1000)
     )
 
-    # Thiet lap VideoWriter neu nguoi dung muon luu video ket qua
+    ret, first_frame = cap.read()
+    if ret:
+        stabilizer.set_reference_frame(first_frame)
+    cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+
+    # 3. KHỞI TẠO MODEL YOLO VÀ TRACKER (BYTETRACK)
+    from ultralytics import YOLO
+    model_weights = cfg.get("models", {}).get("vehicle_detector", {}).get("weights", "yolov8s.pt")
+    logger.info(f"Đang tải model YOLO ({model_weights}) kèm ByteTrack...")
+    yolo_model = YOLO(model_weights)
+
+    # 4. KHỞI TẠO BỘ NHẬN DIỆN ĐÈN TÍN HIỆU
+    tl_detector = TrafficLightDetector(yolo_model=yolo_model)
+
+    # 5. KHỞI TẠO LOGIC VI PHẠM (VIOLATION ENGINE)
+    output_dir = Path(cfg.get("general", {}).get("output_dir", "violations"))
+    violation_engine = ViolationEngine(
+        stop_lines=stop_lines,
+        output_dir=output_dir,
+        penalties=cfg.get("penalties", {}),
+        min_violation_frames=cfg.get("violation_logic", {}).get("min_violation_frames", 3),
+        allow_right_turn=cfg.get("violation_logic", {}).get("allow_right_turn", False)
+    )
+
+    # Thiết lập VideoWriter nếu cần lưu video
     writer = None
     fps_in = cap.get(cv2.CAP_PROP_FPS) or 25.0
     w_in = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     h_in = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    
     if output_video:
         fourcc = cv2.VideoWriter_fourcc(*'mp4v')
         writer = cv2.VideoWriter(output_video, fourcc, fps_in, (w_in, h_in))
-        print(f"[INFO] Se luu video ket qua ra: {output_video}")
+        logger.info(f"Đang thiết lập lưu video kết quả ra: {output_video}")
 
+    logger.info("\n" + "=" * 55)
+    logger.info(" HỆ THỐNG PHÁT HIỆN VƯỢT ĐÈN ĐỎ ĐANG HOẠT ĐỘNG")
+    logger.info(" Phím tắt: [q]: Thoát | [t]: Đổi màu đèn | [space]: Tạm dừng")
+    logger.info("=" * 55 + "\n")
+
+    frame_idx = 0
+    paused = False
     prev_time = time.time()
     fps = 0.0
-    paused = False
-    frame_idx = 0
 
-    print("\n" + "="*50)
-    print(" HE THONG PHAT HIEN VUOT DEN DO DANG CHAY")
-    if not headless:
-        print(" Phim tat:")
-        print("   [q] : Thoat")
-        print("   [t] : Chuyen trang thai den (Do <-> Vang <-> Xanh)")
-        print("   [space] : Tam dung / Tiep tuc")
-    print("="*50 + "\n")
+    class_names_map = {0: "Nguoi di bo", 1: "Xe dap", 2: "O to", 3: "Xe may", 5: "Xe buyt", 7: "Xe tai"}
 
-    while cap.isOpened():
+    while True:
         if not paused:
             ret, frame = cap.read()
             if not ret:
-                print("[INFO] Da xem het video.")
+                logger.info("Đã xử lý hết video.")
                 break
             frame_idx += 1
 
-            # 1. Cap nhat trang thai den
-            traffic_state = tl_detector.update(frame)
+            # Ổn định hóa vạch dừng nếu camera rung lắc
+            current_stop_lines = stabilizer.stabilize_lines(stop_lines, frame)
+            violation_engine.update_stop_lines(current_stop_lines)
 
-            # 2. Xu ly tracking & phat hien vuot den do
-            annotated_frame, new_violations = detector.process_frame(frame, traffic_state, frame_idx=frame_idx)
+            # Chạy YOLO Tracking với ByteTrack
+            results = yolo_model.track(
+                frame,
+                persist=True,
+                tracker=cfg.get("models", {}).get("vehicle_detector", {}).get("tracker", "bytetrack.yaml"),
+                classes=cfg.get("models", {}).get("vehicle_detector", {}).get("track_classes", [0, 1, 2, 3, 5, 7]),
+                conf=cfg.get("models", {}).get("vehicle_detector", {}).get("conf", 0.35),
+                verbose=False
+            )
 
-            # 3. Ve hop den giao thong
-            tl_detector.draw(annotated_frame)
+            # Thu thập tracks
+            tracks = []
+            if results and len(results) > 0 and results[0].boxes is not None:
+                boxes_data = results[0].boxes
+                for i in range(len(boxes_data)):
+                    box = boxes_data.xyxy[i].cpu().numpy().astype(int)
+                    cls_id = int(boxes_data.cls[i].cpu().numpy())
+                    conf = float(boxes_data.conf[i].cpu().numpy())
+                    track_id = int(boxes_data.id[i].cpu().numpy()) if boxes_data.id is not None and boxes_data.id[i] is not None else (i + 1)
 
-            # 4. Tinh FPS
-            curr_time = time.time()
-            fps = 1.0 / (curr_time - prev_time) if (curr_time - prev_time) > 0 else fps
-            prev_time = curr_time
+                    tracks.append({
+                        "id": track_id,
+                        "box": box,
+                        "class_name": class_names_map.get(cls_id, "O to"),
+                        "conf": conf
+                    })
 
-            # 5. Ve HUD Dashboard
+            # Nhận diện trạng thái đèn giao thông
+            traffic_state, _ = tl_detector.detect_state(frame)
+
+            # Xử lý cắt vạch & vi phạm
+            annotated_frame, frame_violations = violation_engine.process_tracks(
+                frame=frame,
+                tracks=tracks,
+                traffic_state=traffic_state,
+                frame_idx=frame_idx
+            )
+
+            # Tính toán FPS
+            now = time.time()
+            fps = 0.9 * fps + 0.1 * (1.0 / max(1e-4, now - prev_time))
+            prev_time = now
+
+            # Vẽ HUD Dashboard
+            line_desc = f"{len(current_stop_lines)} vach ({mode.upper()})"
             draw_hud(
                 frame=annotated_frame,
                 traffic_state=traffic_state,
-                total_violations=len(detector.violated_ids),
+                total_violations=len(violation_engine.violated_ids),
                 fps=fps,
-                recent_violations=detector.violations_log
+                stop_lines_info=line_desc,
+                camera_id=camera_id
             )
 
-            # Ghi video neu duoc yeu cau
             if writer:
                 writer.write(annotated_frame)
 
-            if not headless:
-                cv2.imshow("Red Light Violation Detection", annotated_frame)
-                key = cv2.waitKey(1) & 0xFF
-                if key == ord('q'):
-                    break
-                elif key == ord('t'):
-                    new_s = tl_detector.toggle_state()
-                    print(f"[INFO] Da chuyen thu cong sang den: {new_s}")
-                elif key == 32:  # phim space
-                    paused = not paused
-                    print(f"[INFO] {'Tam dung' if paused else 'Tiep tuc'}")
+        if not headless:
+            cv2.imshow("He Thong Phat Hien Vuot Den Do", annotated_frame)
+            key = cv2.waitKey(1) & 0xFF
+            if key == ord('q'):
+                break
+            elif key == ord('t'):
+                new_state = tl_detector.toggle_state()
+                logger.info(f"Đã chuyển trạng thái đèn thủ công sang: {new_state}")
+            elif key == 32:
+                paused = not paused
+                logger.info(f"{'Tạm dừng' if paused else 'Tiếp tục'}")
 
     cap.release()
     if writer:
         writer.release()
     if not headless:
         cv2.destroyAllWindows()
-    print(f"\n[HOAN TAT] Tong so phuong tien vi pham: {len(detector.violated_ids)}")
-    print(f"File bao cao phat nguoi JSON: {config.OUTPUT_DIR / 'traffic_citations.json'}")
-    print(f"File bao cao tong hop Markdown: {config.OUTPUT_DIR / 'traffic_citations_report.md'}")
+
+    # 6. XUẤT BÁO CÁO PHẠT NGUỘI JSON, CSV, MARKDOWN
+    report_gen = ReportGenerator(output_dir=output_dir)
+    report_gen.export_reports(violation_engine.violations_log)
+
+    logger.info(f"\n[HOÀN TẤT] Tổng số phương tiện vi phạm xử phạt: {len(violation_engine.violated_ids)}")
+    logger.info(f"Báo cáo JSON: {output_dir / 'traffic_citations.json'}")
+    logger.info(f"Báo cáo CSV:  {output_dir / 'traffic_citations.csv'}")
+    logger.info(f"Báo cáo Markdown: {output_dir / 'traffic_citations_report.md'}")
+
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="He thong phat hien vuot den do bang YOLO")
-    parser.add_argument("--source", type=str, default="demo.mp4", help="Duong dan video hoac ID camera (0, 1...)")
-    parser.add_argument("--model", type=str, default=config.MODEL_PATH, help="Duong dan model YOLO (yolov8s.pt / best.pt)")
-    parser.add_argument("--output", type=str, default="output_violation.mp4", help="Duong dan luu video ket qua")
-    parser.add_argument("--headless", action="store_true", help="Chay khong hien cua so giao dien")
-    parser.add_argument("--manual-lines", action="store_true", help="Su dung toa do vach co dinh trong config thay vi tu dong phan tich video")
+    parser = argparse.ArgumentParser(description="Hệ thống phát hiện phương tiện vượt đèn đỏ tự động định vị vạch dừng")
+    parser.add_argument("--video", "--source", dest="video", type=str, default="dataset_videos/red1.mp4", help="Đường dẫn file video hoặc ID camera")
+    parser.add_argument("--camera-id", type=str, default="cam_01", help="ID định danh camera (cam_01, cam_red1...)")
+    parser.add_argument("--mode", type=str, default="classical", choices=["classical", "ai"], help="Chế độ quét vạch dừng (classical / ai)")
+    parser.add_argument("--redetect", action="store_true", help="Bỏ qua cache và ép buộc quét lại vạch mới")
+    parser.add_argument("--output", type=str, default="output_violation.mp4", help="Đường dẫn lưu video kết quả")
+    parser.add_argument("--stabilize", action="store_true", help="Bật chống rung lắc camera bằng Homography")
+    parser.add_argument("--headless", action="store_true", help="Chạy chế độ ngầm không mở cửa sổ giao diện")
     args = parser.parse_args()
 
-    run_detection(
-        source=args.source,
+    run_pipeline(
+        video_source=args.video,
+        camera_id=args.camera_id,
+        mode=args.mode,
+        redetect=args.redetect,
         output_video=args.output,
-        model_path=args.model,
-        headless=args.headless,
-        auto_detect_lines=not args.manual_lines
+        stabilize=args.stabilize,
+        headless=args.headless
     )

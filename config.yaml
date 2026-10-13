@@ -1,0 +1,114 @@
+# ==============================================================================
+# HỆ THỐNG PHÁT HIỆN PHƯƠNG TIỆN VƯỢT ĐÈN ĐỎ & TỰ ĐỘNG NHẬN DIỆN VẠCH DỪNG
+# File cấu hình tập trung (config.yaml)
+# ==============================================================================
+
+general:
+  output_dir: "violations"
+  save_video: true
+  output_video_path: "output_violation.mp4"
+  device: "auto" # "cpu", "cuda", "0", "auto"
+
+camera:
+  default_id: "cam_01"
+  cache_dir: "configs"
+  redetect: false # ép buộc quét lại vạch thay vì đọc từ cache
+  stabilization_enabled: false # bật/tắt chống rung homography
+
+models:
+  vehicle_detector:
+    weights: "yolov8s.pt"
+    conf: 0.35
+    tracker: "bytetrack.yaml"
+    # Class COCO: 0: person, 1: bicycle, 2: car, 3: motorcycle, 5: bus, 7: truck
+    track_classes: [0, 1, 2, 3, 5, 7]
+  traffic_light:
+    weights: "yolov8s.pt"
+    class_id: 9 # class 'traffic light' trong COCO
+    conf: 0.25
+    hsv_ranges:
+      RED:
+        lower1: [0, 100, 100]
+        upper1: [10, 255, 255]
+        lower2: [160, 100, 100]
+        upper2: [180, 255, 255]
+      YELLOW:
+        lower: [15, 100, 100]
+        upper: [35, 255, 255]
+      GREEN:
+        lower: [40, 100, 100]
+        upper: [90, 255, 255]
+  stopline_seg:
+    weights: "yolov8s-seg.pt"
+    conf: 0.30
+    classes: ["stop_line", "zebra_crossing"]
+
+stopline_detector:
+  default_mode: "classical" # "classical" (Chế độ A) hoặc "ai" (Chế độ B)
+  
+  # Cấu hình Chế độ A - Baseline Cổ điển
+  classical:
+    sample_frames: 200 # số frame đọc cách đều từ đầu video
+    roi:
+      y_min_ratio: 0.45 # chỉ xét vùng mặt đường hoạt động
+      y_max_ratio: 0.82
+    filter:
+      brightness_percentile: 85
+      min_brightness: 115
+      horizontal_kernel: [25, 3] # kernel morphology lọc vạch ngang
+      canny_thresh: [50, 150]
+      hough_threshold: 35
+      hough_min_line_len: 35
+      hough_max_line_gap: 30
+      max_slope: 0.08 # độ dốc tối đa cho phép (|dy/dx|)
+      max_dy: 16 # độ lệch Y tối đa giữa 2 đầu đoạn thẳng
+    clustering:
+      y_threshold: 40 # gom nhóm các đoạn thẳng có khoảng cách Y < 40px
+      min_span_ratio: 0.22 # vạch phải trải rộng ít nhất 22% chiều rộng khung hình
+    fitting:
+      method: "fitline" # "fitline" hoặc "ransac"
+      max_flat_dy: 6 # ép phẳng ngang (độ lệch Y tối đa 6px)
+    selection:
+      max_lines: 1 # mặc định 1 vạch dừng chính
+      secondary_distance_thresh: 220 # khoảng cách tối thiểu nếu có vạch thứ 2
+
+  # Cấu hình Chế độ B - Model AI (YOLO-seg)
+  ai:
+    sample_frames: 50
+    mask_conf: 0.35
+    zebra_assist: true # dùng vạch đi bộ làm tín hiệu định vị phụ
+    ema_alpha: 0.2 # hệ số làm mượt theo thời gian
+
+stabilization:
+  method: "ORB" # "ORB" hoặc "SIFT"
+  max_features: 1000
+  ransac_thresh: 3.0
+  min_matches: 20
+
+violation_logic:
+  reference_point: "bottom_center" # trung điểm cạnh đáy bbox
+  min_violation_frames: 3 # số frame liên tiếp qua vạch để tránh nhiễu
+  allow_right_turn: false # cấu hình cho phép hay cấm rẽ phải khi đèn đỏ
+  right_turn_x_ratio: 0.75 # làn rẽ phải thường nằm bên mép phải (x > 75% W)
+
+penalties:
+  "O to":
+    fine_range: "4.000.000 - 6.000.000 VNĐ"
+    suspension: "Tước GPLX 1 - 3 tháng"
+    legal_code: "Nghị định 100/2019/NĐ-CP (sửa đổi NĐ 123/2021/NĐ-CP)"
+  "Xe may":
+    fine_range: "800.000 - 1.000.000 VNĐ"
+    suspension: "Tước GPLX 1 - 3 tháng"
+    legal_code: "Nghị định 100/2019/NĐ-CP"
+  "Xe tai":
+    fine_range: "4.000.000 - 6.000.000 VNĐ"
+    suspension: "Tước GPLX 1 - 3 tháng"
+    legal_code: "Nghị định 100/2019/NĐ-CP"
+  "Xe buyt":
+    fine_range: "4.000.000 - 6.000.000 VNĐ"
+    suspension: "Tước GPLX 1 - 3 tháng"
+    legal_code: "Nghị định 100/2019/NĐ-CP"
+  "Xe dap":
+    fine_range: "100.000 - 200.000 VNĐ"
+    suspension: "Không tước GPLX"
+    legal_code: "Nghị định 100/2019/NĐ-CP"

@@ -1,14 +1,22 @@
 from pathlib import Path
+import yaml
 
 # Thư mục gốc dự án
 BASE_DIR = Path(__file__).resolve().parent
+YAML_PATH = BASE_DIR / "config.yaml"
+
+def _load_yaml():
+    if YAML_PATH.exists():
+        with open(YAML_PATH, "r", encoding="utf-8") as f:
+            return yaml.safe_load(f) or {}
+    return {}
+
+_CFG = _load_yaml()
 
 # Cấu hình Model mặc định
-MODEL_PATH = "yolov8s.pt"
-
-# Các class COCO cần theo dõi: 
-# 0: person, 1: bicycle, 2: car, 3: motorcycle, 5: bus, 7: truck
-TRACK_CLASSES = [0, 1, 2, 3, 5, 7]
+MODEL_PATH = _CFG.get("models", {}).get("vehicle_detector", {}).get("weights", "yolov8s.pt")
+CONF_THRESHOLD = _CFG.get("models", {}).get("vehicle_detector", {}).get("conf", 0.35)
+TRACK_CLASSES = _CFG.get("models", {}).get("vehicle_detector", {}).get("track_classes", [0, 1, 2, 3, 5, 7])
 
 CLASS_NAMES_VI = {
     0: "Nguoi di bo",
@@ -19,105 +27,19 @@ CLASS_NAMES_VI = {
     7: "Xe tai"
 }
 
-CONF_THRESHOLD = 0.35
+OUTPUT_DIR = BASE_DIR / _CFG.get("general", {}).get("output_dir", "violations")
+OUTPUT_DIR.mkdir(exist_ok=True, parents=True)
 
-# ================= CẤU HÌNH ĐA VẠCH DỪNG (MULTIPLE STOP LINES) =================
-# Cấu hình chuẩn xác 100% khớp với vạch sơn trắng thực tế trên mặt đường:
-# - Vạch 1: Làn phía trên (đầu ngã tư phía xa, xe đi từ trên xuống)
-# - Vạch 2: Làn đi thẳng phía dưới (chạy chéo theo đúng vạch sơn trắng thực tế từ x=350 sang mép phải x=1050)
-
-DEFAULT_STOP_LINES = [
-    {
-        "id": "line_1",
-        "name": "Vach 1 (Lan xa - Huong tren xuong)",
-        "line": [(20, 440), (580, 440)],
-        "direction": "TOP_TO_BOTTOM"
-    },
-    {
-        "id": "line_2",
-        "name": "Vach 2 (Lan gan - Huong duoi len)",
-        "line": [(350, 640), (1050, 675)],
-        "direction": "BOTTOM_TO_TOP"
-    }
-]
-
-# Tự động phân tích video để tự động phát hiện vạch dừng (True: tự động quét mặt đường; False: dùng thủ công)
-AUTO_DETECT_STOP_LINES = True
-
-# Cấu hình vạch dừng thủ công dự phòng:
-VIDEO_STOP_LINES_MAP = {
-    "demo.mp4": [
-        {
-            "id": "line_1",
-            "name": "Vach dung nga tu",
-            "line": [(230, 480), (1070, 480)],
-            "direction": "TOP_TO_BOTTOM"
-        }
-    ]
-}
-
+# Tương thích ngược get_stop_lines
 def get_stop_lines(source_path: str, auto_detect: bool = True):
-    """
-    Lay danh sach cac vach dung cho video:
-    - Neu auto_detect = True: Tu dong phan tich mat duong va phat hien vach dung thuc te cua video do.
-    - Neu auto_detect = False hoac khong phat hien duoc: tra ve cau hinh thu cong hoac danh sach rong.
-    """
-    if auto_detect:
-        try:
-            from auto_stop_line import get_auto_stop_lines
-            auto_lines = get_auto_stop_lines(source_path)
-            if auto_lines and len(auto_lines) > 0:
-                return auto_lines
-        except Exception as e:
-            print(f"[CANH BAO] Loi khi tu dong nhan dien vach: {e}")
+    from src.stopline_detector import StopLineDetector
+    detector = StopLineDetector(config_path=YAML_PATH)
+    cam_id = Path(str(source_path)).stem
+    return detector.detect(source_path, camera_id=cam_id, mode="classical")
 
-    name = Path(str(source_path)).name
-    return VIDEO_STOP_LINES_MAP.get(name, DEFAULT_STOP_LINES)
-
-# ================= CẤU HÌNH ĐÈN TÍN HIỆU =================
+# Đèn tín hiệu
 TRAFFIC_LIGHT_ROI = (1120, 100, 60, 150)
 TRAFFIC_LIGHT_MODE = "TIMER"
+TIMER_CYCLE = {"RED": 8, "GREEN": 8, "YELLOW": 3}
 
-TIMER_CYCLE = {
-    "RED": 8,     # Đèn đỏ trong 8 giây
-    "GREEN": 8,   # Đèn xanh trong 8 giây
-    "YELLOW": 3   # Đèn vàng trong 3 giây
-}
-
-# ================= MỨC PHẠT NGUỘI THAM CHIẾU (Nghị định 100 & 123) =================
-PENALTY_REGULATIONS = {
-    "O to": {
-        "fine_range": "4.000.000 - 6.000.000 VNĐ",
-        "suspension": "Tước quyền sử dụng GPLX từ 01 đến 03 tháng",
-        "legal_code": "Điểm a Khoản 5 Điều 5 NĐ 100/2019/NĐ-CP (sửa đổi NĐ 123/2021)"
-    },
-    "Xe may": {
-        "fine_range": "800.000 - 1.000.000 VNĐ",
-        "suspension": "Tước quyền sử dụng GPLX từ 01 đến 03 tháng",
-        "legal_code": "Điểm e Khoản 4 Điều 6 NĐ 100/2019/NĐ-CP"
-    },
-    "Xe tai": {
-        "fine_range": "4.000.000 - 6.000.000 VNĐ",
-        "suspension": "Tước quyền sử dụng GPLX từ 01 đến 03 tháng",
-        "legal_code": "Điểm a Khoản 5 Điều 5 NĐ 100/2019/NĐ-CP"
-    },
-    "Xe buyt": {
-        "fine_range": "4.000.000 - 6.000.000 VNĐ",
-        "suspension": "Tước quyền sử dụng GPLX từ 01 đến 03 tháng",
-        "legal_code": "Điểm a Khoản 5 Điều 5 NĐ 100/2019/NĐ-CP"
-    },
-    "Xe dap": {
-        "fine_range": "100.000 - 200.000 VNĐ",
-        "suspension": "Không áp dụng",
-        "legal_code": "Điểm đ Khoản 2 Điều 8 NĐ 100/2019/NĐ-CP"
-    },
-    "Nguoi di bo": {
-        "fine_range": "60.000 - 100.000 VNĐ",
-        "suspension": "Không áp dụng",
-        "legal_code": "Điểm a Khoản 1 Điều 9 NĐ 100/2019/NĐ-CP"
-    }
-}
-
-# Thư mục lưu bằng chứng và báo cáo
-OUTPUT_DIR = BASE_DIR / "violations"
-OUTPUT_DIR.mkdir(exist_ok=True, parents=True)
+PENALTY_REGULATIONS = _CFG.get("penalties", {})
