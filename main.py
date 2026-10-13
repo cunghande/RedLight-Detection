@@ -70,7 +70,8 @@ def run_pipeline(
     redetect: bool = False,
     output_video: Optional[str] = "output_violation.mp4",
     stabilize: bool = False,
-    headless: bool = False
+    headless: bool = False,
+    debug: bool = False
 ):
     cfg = load_yaml_config("config.yaml")
 
@@ -82,7 +83,13 @@ def run_pipeline(
 
     # 1. KHỞI TẠO BỘ PHÁT HIỆN VẠCH DỪNG (CHẠY 1 LẦN HOẶC ĐỌC CACHE)
     line_detector = StopLineDetector(config_path="config.yaml")
-    stop_lines = line_detector.detect(video_source, camera_id=camera_id, mode=mode, redetect=redetect)
+    stop_lines = line_detector.detect(
+        video_source,
+        camera_id=camera_id,
+        mode=mode,
+        redetect=redetect,
+        debug=debug
+    )
 
     if not stop_lines:
         logger.error(f"[LỖI] Không thể phát hiện hoặc đọc vạch dừng cho video: {video_source}")
@@ -247,6 +254,7 @@ if __name__ == "__main__":
     parser.add_argument("--output", type=str, default="output_violation.mp4", help="Đường dẫn lưu video kết quả")
     parser.add_argument("--stabilize", action="store_true", help="Bật chống rung lắc camera bằng Homography")
     parser.add_argument("--headless", action="store_true", help="Chạy chế độ ngầm không mở cửa sổ giao diện")
+    parser.add_argument("--debug", action="store_true", help="Xuất ảnh debug chi tiết: dòng xe, Road ROI, cụm xe dừng, ứng viên kèm bảng điểm")
     args = parser.parse_args()
 
     run_pipeline(
@@ -256,5 +264,6 @@ if __name__ == "__main__":
         redetect=args.redetect,
         output_video=args.output,
         stabilize=args.stabilize,
-        headless=args.headless
+        headless=args.headless,
+        debug=args.debug
     )

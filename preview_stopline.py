@@ -18,7 +18,8 @@ def preview_and_confirm(
     mode: str = "classical",
     redetect: bool = False,
     output_image: str = "preview_stopline.jpg",
-    headless: bool = False
+    headless: bool = False,
+    debug: bool = False
 ):
     video_p = Path(video_path)
     if not video_p.exists():
@@ -34,7 +35,13 @@ def preview_and_confirm(
 
     # 1. Chạy detector đề xuất vạch dừng
     detector = StopLineDetector(config_path="config.yaml")
-    proposed_lines = detector.detect(video_p, camera_id=camera_id, mode=mode, redetect=redetect)
+    proposed_lines = detector.detect(
+        video_p,
+        camera_id=camera_id,
+        mode=mode,
+        redetect=redetect,
+        debug=debug
+    )
 
     if not proposed_lines:
         logger.warning("[CẢNH BÁO] Không phát hiện thấy vạch dừng đề xuất tự động! Chuyển sang chế độ vẽ tay thủ công.")
@@ -143,6 +150,7 @@ if __name__ == "__main__":
     parser.add_argument("--redetect", action="store_true", help="Bỏ qua cache và ép phát hiện lại")
     parser.add_argument("--output-img", type=str, default="preview_stopline.jpg", help="Đường dẫn xuất ảnh xem trước")
     parser.add_argument("--headless", action="store_true", help="Chạy không mở cửa sổ giao diện")
+    parser.add_argument("--debug", action="store_true", help="Xuất ảnh debug chi tiết: dòng xe, Road ROI, cụm xe dừng, ứng viên kèm bảng điểm")
     args = parser.parse_args()
 
     preview_and_confirm(
@@ -151,5 +159,6 @@ if __name__ == "__main__":
         mode=args.mode,
         redetect=args.redetect,
         output_image=args.output_img,
-        headless=args.headless
+        headless=args.headless,
+        debug=args.debug
     )

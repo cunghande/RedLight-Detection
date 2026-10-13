@@ -53,22 +53,29 @@ stopline_detector:
       y_min_ratio: 0.45 # chỉ xét vùng mặt đường hoạt động
       y_max_ratio: 0.82
     filter:
-      brightness_percentile: 85
-      min_brightness: 115
-      horizontal_kernel: [25, 3] # kernel morphology lọc vạch ngang
-      canny_thresh: [50, 150]
-      hough_threshold: 35
-      hough_min_line_len: 35
+      use_clahe: true # dùng CLAHE cân bằng độ tương phản cục bộ
+      clahe_clip_limit: 3.0
+      clahe_tile_grid: [8, 8]
+      adaptive_method: "gaussian" # "gaussian" hoặc "otsu"
+      canny_thresh: [40, 120]
+      hough_threshold: 30
+      hough_min_line_len: 30
       hough_max_line_gap: 30
-      max_slope: 0.08 # độ dốc tối đa cho phép (|dy/dx|)
-      max_dy: 16 # độ lệch Y tối đa giữa 2 đầu đoạn thẳng
+      max_slope: 0.15 # góc nghiêng lọc sơ bộ
+      max_dy: 25
     clustering:
-      y_threshold: 40 # gom nhóm các đoạn thẳng có khoảng cách Y < 40px
-      min_span_ratio: 0.22 # vạch phải trải rộng ít nhất 22% chiều rộng khung hình
-    fitting:
-      method: "fitline" # "fitline" hoặc "ransac"
-      max_flat_dy: 6 # ép phẳng ngang (độ lệch Y tối đa 6px)
+      collinear_dist_thresh: 25 # khoảng cách tối đa để gộp 2 đoạn thẳng cùng hướng
+      max_candidates: 30 # số ứng viên tối đa sinh ra
+    # HỆ THỐNG CHẤM ĐIỂM ĐA TIÊU CHÍ (MULTI-CRITERIA SCORING)
+    scoring_weights:
+      angle_perpendicular: 0.35 # vạch vuông góc với dòng xe (song song bị loại)
+      trajectory_intersection: 0.25 # số quỹ đạo xe cắt qua vạch
+      stopped_cluster_distance: 0.20 # nằm ngay trước cụm xe dừng
+      relative_length: 0.15 # chiều dài so với bề rộng mặt đường
+      crosswalk_relation: 0.05 # nằm trước vạch đi bộ
     selection:
+      min_confidence_thresh: 0.52 # ngưỡng điểm tối thiểu để tự động chọn (dưới mức này sẽ cảnh báo và yêu cầu xác nhận)
+      top_k_candidates: 5 # lưu và hiển thị top-5 ứng viên sáng giá nhất
       max_lines: 1 # mặc định 1 vạch dừng chính
       secondary_distance_thresh: 220 # khoảng cách tối thiểu nếu có vạch thứ 2
 
