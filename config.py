@@ -41,36 +41,11 @@ DEFAULT_STOP_LINES = [
     }
 ]
 
-# Cấu hình vạch dừng theo từng video:
+# Tự động phân tích video để tự động phát hiện vạch dừng (True: tự động quét mặt đường; False: dùng thủ công)
+AUTO_DETECT_STOP_LINES = True
+
+# Cấu hình vạch dừng thủ công dự phòng:
 VIDEO_STOP_LINES_MAP = {
-    "red1.mp4": [
-        {
-            "id": "line_1",
-            "name": "Vach 1 (Lan xa - Huong tren xuong)",
-            "line": [(20, 440), (580, 440)],
-            "direction": "TOP_TO_BOTTOM"
-        },
-        {
-            "id": "line_2",
-            "name": "Vach 2 (Lan gan - Huong duoi len)",
-            "line": [(350, 640), (1050, 675)],
-            "direction": "BOTTOM_TO_TOP"
-        }
-    ],
-    "red2.mp4": [
-        {
-            "id": "line_1",
-            "name": "Vach 1 (Lan xa)",
-            "line": [(20, 440), (580, 440)],
-            "direction": "TOP_TO_BOTTOM"
-        },
-        {
-            "id": "line_2",
-            "name": "Vach 2 (Lan gan)",
-            "line": [(350, 640), (1050, 675)],
-            "direction": "BOTTOM_TO_TOP"
-        }
-    ],
     "demo.mp4": [
         {
             "id": "line_1",
@@ -81,8 +56,21 @@ VIDEO_STOP_LINES_MAP = {
     ]
 }
 
-def get_stop_lines(source_path: str):
-    """Tu dong lay danh sach tat ca cac vach dung cho video"""
+def get_stop_lines(source_path: str, auto_detect: bool = True):
+    """
+    Lay danh sach cac vach dung cho video:
+    - Neu auto_detect = True: Tu dong phan tich mat duong va phat hien vach dung thuc te cua video do.
+    - Neu auto_detect = False hoac khong phat hien duoc: tra ve cau hinh thu cong hoac danh sach rong.
+    """
+    if auto_detect:
+        try:
+            from auto_stop_line import get_auto_stop_lines
+            auto_lines = get_auto_stop_lines(source_path)
+            if auto_lines and len(auto_lines) > 0:
+                return auto_lines
+        except Exception as e:
+            print(f"[CANH BAO] Loi khi tu dong nhan dien vach: {e}")
+
     name = Path(str(source_path)).name
     return VIDEO_STOP_LINES_MAP.get(name, DEFAULT_STOP_LINES)
 

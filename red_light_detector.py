@@ -78,24 +78,31 @@ class CentroidTracker:
         return self.objects.copy()
 
 class RedLightViolationDetector:
-    def __init__(self, model_path=config.MODEL_PATH, conf=config.CONF_THRESHOLD, stop_lines=None, source_name="video"):
+    def __init__(self, model_path=config.MODEL_PATH, conf=config.CONF_THRESHOLD, stop_lines=None, source_name="video", auto_detect_lines=True):
         self.detector = get_detector(model_path)
         self.model_name = self.detector.name
         self.conf = conf
         self.source_name = source_name
         
-        # Danh sach cac vach dung (ho tro nhieu vach)
-        raw_lines = stop_lines or config.get_stop_lines(source_name)
+        # Danh sach cac vach dung (ho tro tu dong nhan dien thuc te theo video)
+        if stop_lines is not None:
+            raw_lines = stop_lines
+        else:
+            raw_lines = config.get_stop_lines(source_name, auto_detect=auto_detect_lines)
+            
         # Chuan hoa ve danh sach dict neu nguoi dung truyen dang list cu
         if isinstance(raw_lines, list) and len(raw_lines) > 0 and isinstance(raw_lines[0], tuple):
             self.stop_lines = [{"id": "line_1", "name": "Vach dung", "line": raw_lines, "direction": config.MOVE_DIRECTION}]
         else:
-            self.stop_lines = raw_lines
+            self.stop_lines = raw_lines or []
 
         print(f"[INFO] Khoi tao thanh cong voi model: {self.model_name}")
-        print(f"[INFO] He thong dang theo doi {len(self.stop_lines)} vach dung:")
-        for s in self.stop_lines:
-            print(f"   -> {s['name']}: {s['line']} (Huong: {s['direction']})")
+        if len(self.stop_lines) > 0:
+            print(f"[INFO] He thong nhan dien va theo doi {len(self.stop_lines)} vach dung thuc te:")
+            for s in self.stop_lines:
+                print(f"   -> {s['name']}: {s['line']} (Huong: {s['direction']})")
+        else:
+            print(f"[CANH BAO] Video khong co hoac chua xac dinh duoc vach dung mat duong!")
         
         self.tracker = CentroidTracker()
         self.previous_positions = {}

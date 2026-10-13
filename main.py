@@ -63,7 +63,7 @@ def draw_hud(frame, traffic_state, total_violations, fps, recent_violations):
             cv2.putText(frame, txt, (panel_x + 12, panel_y + 52 + i * 26),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.48, (255, 255, 255), 1)
 
-def run_detection(source, output_video=None, model_path=config.MODEL_PATH, headless=False):
+def run_detection(source, output_video=None, model_path=config.MODEL_PATH, headless=False, auto_detect_lines=True):
     # Kiem tra nguon video (so camera hoac file path)
     if str(source).isdigit():
         source = int(source)
@@ -85,7 +85,11 @@ def run_detection(source, output_video=None, model_path=config.MODEL_PATH, headl
         roi=config.TRAFFIC_LIGHT_ROI,
         timer_cycle=config.TIMER_CYCLE
     )
-    detector = RedLightViolationDetector(model_path=model_path, source_name=str(source))
+    detector = RedLightViolationDetector(
+        model_path=model_path,
+        source_name=str(source),
+        auto_detect_lines=auto_detect_lines
+    )
 
     # Thiet lap VideoWriter neu nguoi dung muon luu video ket qua
     writer = None
@@ -174,6 +178,13 @@ if __name__ == "__main__":
     parser.add_argument("--model", type=str, default=config.MODEL_PATH, help="Duong dan model YOLO (yolov8s.pt / best.pt)")
     parser.add_argument("--output", type=str, default="output_violation.mp4", help="Duong dan luu video ket qua")
     parser.add_argument("--headless", action="store_true", help="Chay khong hien cua so giao dien")
+    parser.add_argument("--manual-lines", action="store_true", help="Su dung toa do vach co dinh trong config thay vi tu dong phan tich video")
     args = parser.parse_args()
 
-    run_detection(source=args.source, output_video=args.output, model_path=args.model, headless=args.headless)
+    run_detection(
+        source=args.source,
+        output_video=args.output,
+        model_path=args.model,
+        headless=args.headless,
+        auto_detect_lines=not args.manual_lines
+    )
