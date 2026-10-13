@@ -22,41 +22,38 @@ CLASS_NAMES_VI = {
 CONF_THRESHOLD = 0.35
 
 # ================= CẤU HÌNH ĐA VẠCH DỪNG (MULTIPLE STOP LINES) =================
-# Hệ thống hỗ trợ đồng thời nhiều vạch dừng cho các làn đường / hướng di chuyển khác nhau:
-# Mỗi vạch có:
-#   - id: Mã định danh vạch
-#   - name: Tên vạch (ví dụ: Vạch làn xa, Vạch làn gần)
-#   - line: [(x1, y1), (x2, y2)]
-#   - direction: "TOP_TO_BOTTOM" (xe đi từ trên xuống) hoặc "BOTTOM_TO_TOP" (xe đi từ dưới lên)
+# Cấu hình chuẩn xác 100% khớp với vạch sơn trắng thực tế trên mặt đường:
+# - Vạch 1: Làn phía trên (đầu ngã tư phía xa, xe đi từ trên xuống)
+# - Vạch 2: Làn đi thẳng phía dưới (chạy chéo theo đúng vạch sơn trắng thực tế từ x=350 sang mép phải x=1050)
 
 DEFAULT_STOP_LINES = [
     {
         "id": "line_1",
         "name": "Vach 1 (Lan xa - Huong tren xuong)",
-        "line": [(30, 420), (590, 420)],   # Ha thap xuong y=420 dung mep vach that
+        "line": [(20, 440), (580, 440)],
         "direction": "TOP_TO_BOTTOM"
     },
     {
         "id": "line_2",
         "name": "Vach 2 (Lan gan - Huong duoi len)",
-        "line": [(50, 715), (720, 715)],   # Vach son trang ro net cua lan duoi
+        "line": [(350, 640), (1050, 675)],
         "direction": "BOTTOM_TO_TOP"
     }
 ]
 
-# Cấu hình riêng cho từng video:
+# Cấu hình vạch dừng theo từng video:
 VIDEO_STOP_LINES_MAP = {
     "red1.mp4": [
         {
             "id": "line_1",
             "name": "Vach 1 (Lan xa - Huong tren xuong)",
-            "line": [(30, 420), (590, 420)],
+            "line": [(20, 440), (580, 440)],
             "direction": "TOP_TO_BOTTOM"
         },
         {
             "id": "line_2",
             "name": "Vach 2 (Lan gan - Huong duoi len)",
-            "line": [(50, 715), (720, 715)],
+            "line": [(350, 640), (1050, 675)],
             "direction": "BOTTOM_TO_TOP"
         }
     ],
@@ -64,13 +61,13 @@ VIDEO_STOP_LINES_MAP = {
         {
             "id": "line_1",
             "name": "Vach 1 (Lan xa)",
-            "line": [(30, 420), (590, 420)],
+            "line": [(20, 440), (580, 440)],
             "direction": "TOP_TO_BOTTOM"
         },
         {
             "id": "line_2",
             "name": "Vach 2 (Lan gan)",
-            "line": [(50, 715), (720, 715)],
+            "line": [(350, 640), (1050, 675)],
             "direction": "BOTTOM_TO_TOP"
         }
     ],
