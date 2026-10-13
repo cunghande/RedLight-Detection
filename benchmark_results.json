@@ -1,0 +1,38 @@
+[
+  {
+    "model_name": "YOLOv8n (Baseline)",
+    "weights_file": "yolov8n.pt",
+    "description": "Mo hinh Baseline sieu nhe, toi uu toc do cao nhat cho Edge AI",
+    "parameters_million": 3.16,
+    "file_size_mb": 6.25,
+    "avg_latency_ms": 73.93,
+    "avg_fps": 13.5,
+    "total_detections": 859,
+    "detections_per_frame": 8.59,
+    "avg_confidence": 0.698
+  },
+  {
+    "model_name": "YOLOv8s (Standard)",
+    "weights_file": "yolov8s.pt",
+    "description": "Mo hinh tieu chuan, can bang giua do chinh xac va toc do",
+    "parameters_million": 11.17,
+    "file_size_mb": 21.54,
+    "avg_latency_ms": 170.98,
+    "avg_fps": 5.8,
+    "total_detections": 972,
+    "detections_per_frame": 9.72,
+    "avg_confidence": 0.724
+  },
+  {
+    "model_name": "YOLO11s (SOTA - The he moi)",
+    "weights_file": "yolo11s.pt",
+    "description": "Kien truc YOLO11 moi nhat, toi uu hoa tham so va feature extraction",
+    "parameters_million": 9.46,
+    "file_size_mb": 18.42,
+    "avg_latency_ms": 139.51,
+    "avg_fps": 7.2,
+    "total_detections": 948,
+    "detections_per_frame": 9.48,
+    "avg_confidence": 0.701
+  }
+]

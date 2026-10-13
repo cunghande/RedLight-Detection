@@ -1,0 +1,62 @@
+[
+  {
+    "violation_id": "VIOLATION_20261013_152403_ID76",
+    "track_id": 76,
+    "vehicle_type": "O to",
+    "confidence": 0.693,
+    "model_used": "Faster R-CNN (ResNet-50)",
+    "time": "2026-10-13 15:24:03",
+    "scene_image": "VIOLATION_20261013_152403_ID76_scene.jpg",
+    "vehicle_image": "VIOLATION_20261013_152403_ID76_vehicle.jpg"
+  },
+  {
+    "violation_id": "VIOLATION_20261013_152428_ID61",
+    "track_id": 61,
+    "vehicle_type": "O to",
+    "confidence": 0.484,
+    "model_used": "Faster R-CNN (ResNet-50)",
+    "time": "2026-10-13 15:24:28",
+    "scene_image": "VIOLATION_20261013_152428_ID61_scene.jpg",
+    "vehicle_image": "VIOLATION_20261013_152428_ID61_vehicle.jpg"
+  },
+  {
+    "violation_id": "VIOLATION_20261013_152452_ID82",
+    "track_id": 82,
+    "vehicle_type": "O to",
+    "confidence": 0.622,
+    "model_used": "Faster R-CNN (ResNet-50)",
+    "time": "2026-10-13 15:24:52",
+    "scene_image": "VIOLATION_20261013_152452_ID82_scene.jpg",
+    "vehicle_image": "VIOLATION_20261013_152452_ID82_vehicle.jpg"
+  },
+  {
+    "violation_id": "VIOLATION_20261013_152533_ID2",
+    "track_id": 2,
+    "vehicle_type": "O to",
+    "confidence": 0.973,
+    "model_used": "Faster R-CNN (ResNet-50)",
+    "time": "2026-10-13 15:25:33",
+    "scene_image": "VIOLATION_20261013_152533_ID2_scene.jpg",
+    "vehicle_image": "VIOLATION_20261013_152533_ID2_vehicle.jpg"
+  },
+  {
+    "violation_id": "VIOLATION_20261013_152555_ID53",
+    "track_id": 53,
+    "vehicle_type": "O to",
+    "confidence": 0.993,
+    "model_used": "Faster R-CNN (ResNet-50)",
+    "time": "2026-10-13 15:25:55",
+    "scene_image": "VIOLATION_20261013_152555_ID53_scene.jpg",
+    "vehicle_image": "VIOLATION_20261013_152555_ID53_vehicle.jpg"
+  },
+  {
+    "violation_id": "VIOLATION_20261013_152611_ID102",
+    "track_id": 102,
+    "vehicle_type": "O to",
+    "confidence": 0.432,
+    "model_used": "Faster R-CNN (ResNet-50)",
+    "time": "2026-10-13 15:26:11",
+    "scene_image": "VIOLATION_20261013_152611_ID102_scene.jpg",
+    "vehicle_image": "VIOLATION_20261013_152611_ID102_vehicle.jpg"
+  }
+]
