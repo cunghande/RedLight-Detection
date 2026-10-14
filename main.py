@@ -67,6 +67,7 @@ def run_pipeline(
     video_source: str,
     camera_id: str = "cam_01",
     mode: str = "classical",
+    ai_model: str = "yolo",
     redetect: bool = False,
     output_video: Optional[str] = "output_violation.mp4",
     stabilize: bool = False,
@@ -87,6 +88,7 @@ def run_pipeline(
         video_source,
         camera_id=camera_id,
         mode=mode,
+        ai_model=ai_model,
         redetect=redetect,
         debug=debug
     )
@@ -250,6 +252,7 @@ if __name__ == "__main__":
     parser.add_argument("--video", "--source", dest="video", type=str, default="dataset_videos/red1.mp4", help="Đường dẫn file video hoặc ID camera")
     parser.add_argument("--camera-id", type=str, default="cam_01", help="ID định danh camera (cam_01, cam_red1...)")
     parser.add_argument("--mode", type=str, default="classical", choices=["classical", "ai"], help="Chế độ quét vạch dừng (classical / ai)")
+    parser.add_argument("--ai-model", type=str, default="yolo", choices=["yolo", "deeplabv3", "maskrcnn"], help="Kiến trúc AI phân đoạn (yolo, deeplabv3, maskrcnn)")
     parser.add_argument("--redetect", action="store_true", help="Bỏ qua cache và ép buộc quét lại vạch mới")
     parser.add_argument("--output", type=str, default="output_violation.mp4", help="Đường dẫn lưu video kết quả")
     parser.add_argument("--stabilize", action="store_true", help="Bật chống rung lắc camera bằng Homography")
@@ -261,6 +264,7 @@ if __name__ == "__main__":
         video_source=args.video,
         camera_id=args.camera_id,
         mode=args.mode,
+        ai_model=args.ai_model,
         redetect=args.redetect,
         output_video=args.output,
         stabilize=args.stabilize,

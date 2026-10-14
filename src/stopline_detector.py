@@ -106,6 +106,7 @@ class StopLineDetector:
         video_source: Union[str, Path, cv2.VideoCapture],
         camera_id: Optional[str] = None,
         mode: str = "classical",
+        ai_model: str = "yolo",
         redetect: bool = False,
         debug: bool = False
     ) -> List[Dict]:
@@ -119,7 +120,7 @@ class StopLineDetector:
                 return cached
 
         if mode == "ai":
-            return self._detect_ai(video_source, camera_id=camera_id, debug=debug)
+            return self._detect_ai(video_source, camera_id=camera_id, ai_model=ai_model, debug=debug)
 
         logger.info(f"Thực hiện phát hiện vạch dừng: SINH ỨNG VIÊN -> CHẤM ĐIỂM -> CHỌN cho '{camera_id}'...")
 
@@ -155,75 +156,189 @@ class StopLineDetector:
         self,
         video_source: Union[str, Path, cv2.VideoCapture],
         camera_id: str,
+        ai_model: str = "yolo",
         debug: bool = False
     ) -> List[Dict]:
-        """Phát hiện vạch dừng bằng mô hình học sâu phân đoạn ảnh (YOLOv8-seg)"""
-        logger.info(f"Thực hiện phát hiện vạch dừng bằng AI SEGMENTATION (Deep Learning) cho '{camera_id}'...")
-        weights_path = Path("best_stopline_seg.pt")
-        if not weights_path.exists():
-            weights_path = Path(self.cfg.get("models", {}).get("stopline_seg", {}).get("weights", "best.pt"))
-
-        ai_model = YOLO(str(weights_path))
+        """Phát hiện vạch dừng bằng các kiến trúc Học sâu: YOLOv8-seg, DeepLabV3+, Mask R-CNN"""
+        logger.info(f"Thực hiện phát hiện vạch dừng bằng AI SEGMENTATION ({ai_model.upper()}) cho '{camera_id}'...")
 
         frames, h, w = self._sample_video_frames(video_source, 20)
         if not frames:
             return []
         bg_frame = np.median(frames, axis=0).astype(np.uint8)
 
-        results = ai_model.predict(bg_frame, conf=0.20, verbose=False)[0]
-
         selected = []
-        if results.masks is not None and len(results.masks) > 0:
-            for i, (box, mask_xy) in enumerate(zip(results.boxes, results.masks.xy)):
-                cls_id = int(box.cls[0])
-                cls_name = ai_model.names.get(cls_id, "stop_line")
-                conf = float(box.conf[0])
 
-                if len(mask_xy) < 3:
-                    continue
+        if ai_model.lower() == "deeplabv3":
+            selected = self._detect_deeplabv3(bg_frame, h, w)
+        elif ai_model.lower() == "maskrcnn":
+            selected = self._detect_maskrcnn(bg_frame, h, w)
+        else: # Mặc định: YOLOv8-seg
+            weights_path = Path("best_stopline_seg.pt")
+            if not weights_path.exists():
+                weights_path = Path(self.cfg.get("models", {}).get("stopline_seg", {}).get("weights", "best.pt"))
 
-                poly = np.array(mask_xy, dtype=np.int32)
-                min_y = int(np.min(poly[:, 1]))
-                max_y = int(np.max(poly[:, 1]))
-                avg_y = int((min_y + max_y) / 2)
+            yolo = YOLO(str(weights_path))
+            results = yolo.predict(bg_frame, conf=0.20, verbose=False)[0]
 
-                # Kiểm tra quá gần với vạch đã chọn trước
-                if any(abs(avg_y - int((prev['line'][0][1] + prev['line'][1][1]) / 2)) < self.secondary_dist_thresh for prev in selected):
-                    continue
+            if results.masks is not None and len(results.masks) > 0:
+                for i, (box, mask_xy) in enumerate(zip(results.boxes, results.masks.xy)):
+                    cls_id = int(box.cls[0])
+                    conf = float(box.conf[0])
 
-                direction = "TOP_TO_BOTTOM" if avg_y < h * 0.55 else "BOTTOM_TO_TOP"
-                line_idx = len(selected) + 1
-                selected.append({
-                    "id": f"stop_line_{line_idx}",
-                    "name": f"Vach {line_idx} (AI YOLO-seg - Y={avg_y})",
-                    "line": [(0, avg_y), (w - 1, avg_y)],
-                    "direction": direction,
-                    "confidence": round(conf, 3),
-                    "method": "ai_yolo_segmentation"
-                })
+                    if len(mask_xy) < 3:
+                        continue
 
-                if len(selected) >= self.max_lines:
-                    break
+                    poly = np.array(mask_xy, dtype=np.int32)
+                    min_y = int(np.min(poly[:, 1]))
+                    max_y = int(np.max(poly[:, 1]))
+                    avg_y = int((min_y + max_y) / 2)
+
+                    if any(abs(avg_y - int((prev['line'][0][1] + prev['line'][1][1]) / 2)) < self.secondary_dist_thresh for prev in selected):
+                        continue
+
+                    direction = "TOP_TO_BOTTOM" if avg_y < h * 0.55 else "BOTTOM_TO_TOP"
+                    line_idx = len(selected) + 1
+                    selected.append({
+                        "id": f"stop_line_{line_idx}",
+                        "name": f"Vach {line_idx} (YOLOv8-seg - Y={avg_y})",
+                        "line": [(0, avg_y), (w - 1, avg_y)],
+                        "direction": direction,
+                        "confidence": round(conf, 3),
+                        "method": "ai_yolo_segmentation"
+                    })
+
+                    if len(selected) >= self.max_lines:
+                        break
 
         if debug:
-            plot_img = results.plot()
+            plot_img = bg_frame.copy()
             for s in selected:
                 p1, p2 = s["line"]
                 cv2.line(plot_img, p1, p2, (0, 255, 0), 4)
                 cv2.putText(plot_img, s["name"], (20, p1[1] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
-            cv2.imwrite(f"debug_ai_prediction_{camera_id}.jpg", plot_img)
-            logger.info(f"[DEBUG] Đã xuất ảnh dự đoán AI ra: debug_ai_prediction_{camera_id}.jpg")
+            cv2.imwrite(f"debug_ai_prediction_{camera_id}_{ai_model}.jpg", plot_img)
+            logger.info(f"[DEBUG] Đã xuất ảnh dự đoán AI ({ai_model}) ra: debug_ai_prediction_{camera_id}_{ai_model}.jpg")
 
         if selected:
-            logger.info(f"[KẾT QUẢ AI] Đã phát hiện {len(selected)} vạch dừng qua AI Segmentation:")
+            logger.info(f"[KẾT QUẢ AI - {ai_model.upper()}] Đã phát hiện {len(selected)} vạch dừng:")
             for s in selected:
                 logger.info(f"   -> {s['name']}: {s['line']} (Confidence: {s['confidence']})")
             logger.info("")
-            self.save_to_cache(camera_id, selected, mode="ai", video_path=str(video_source))
+            self.save_to_cache(camera_id, selected, mode=f"ai_{ai_model}", video_path=str(video_source))
         else:
-            logger.warning("[AI] Không tìm thấy vạch qua AI Segmentation. Tự động chuyển chế độ fallback classical.")
+            logger.warning(f"[AI - {ai_model}] Không tìm thấy vạch. Tự động chuyển chế độ fallback classical.")
             return self.detect(video_source, camera_id=camera_id, mode="classical", redetect=True, debug=debug)
 
+        return selected
+
+    def _detect_deeplabv3(self, bg_frame: np.ndarray, h: int, w: int) -> List[Dict]:
+        """Phát hiện vạch dừng bằng DeepLabV3+ (Pixel-level Semantic Segmentation)"""
+        import torch
+        import torchvision
+        import torch.nn as nn
+
+        weights_path = Path("best_deeplabv3_stopline.pt")
+        if not weights_path.exists():
+            logger.warning(f"Chưa tìm thấy {weights_path}.")
+            return []
+
+        model = torchvision.models.segmentation.deeplabv3_mobilenet_v3_large(weights=None, weights_backbone=None)
+        model.classifier[4] = nn.Conv2d(model.classifier[4].in_channels, 3, 1)
+        model.load_state_dict(torch.load(str(weights_path), map_location="cpu"))
+        model.eval()
+
+        img_in = cv2.resize(bg_frame, (384, 384))
+        img_tensor = torch.from_numpy(img_in[:, :, ::-1].copy()).permute(2, 0, 1).float() / 255.0
+        mean = torch.tensor([0.485, 0.456, 0.406]).view(3, 1, 1)
+        std = torch.tensor([0.229, 0.224, 0.225]).view(3, 1, 1)
+        img_tensor = (img_tensor - mean) / std
+
+        with torch.no_grad():
+            output = model(img_tensor.unsqueeze(0))["out"]
+            pred_mask = torch.argmax(output, dim=1)[0].cpu().numpy()
+
+        mask_orig = cv2.resize((pred_mask == 1).astype(np.uint8), (w, h), interpolation=cv2.INTER_NEAREST)
+        y_hist = np.sum(mask_orig, axis=1)
+
+        peaks = []
+        for y in range(int(h * 0.45), int(h * 0.85)):
+            if y_hist[y] > w * 0.15 and y_hist[y] == np.max(y_hist[max(0, y-25):min(h, y+26)]):
+                peaks.append((y, int(y_hist[y])))
+
+        peaks.sort(key=lambda x: x[1], reverse=True)
+        selected = []
+        for y, count in peaks:
+            if any(abs(y - s["line"][0][1]) < self.secondary_dist_thresh for s in selected):
+                continue
+            direction = "TOP_TO_BOTTOM" if y < h * 0.55 else "BOTTOM_TO_TOP"
+            line_idx = len(selected) + 1
+            conf = min(0.95, round(count / w, 3))
+            selected.append({
+                "id": f"stop_line_{line_idx}",
+                "name": f"Vach {line_idx} (DeepLabV3+ - Y={y})",
+                "line": [(0, y), (w - 1, y)],
+                "direction": direction,
+                "confidence": conf,
+                "method": "ai_deeplabv3_segmentation"
+            })
+            if len(selected) >= self.max_lines:
+                break
+        return selected
+
+    def _detect_maskrcnn(self, bg_frame: np.ndarray, h: int, w: int) -> List[Dict]:
+        """Phát hiện vạch dừng bằng Mask R-CNN (Two-Stage Proposal-based Instance Segmentation)"""
+        import torch
+        import torchvision
+        from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
+        from torchvision.models.detection.mask_rcnn import MaskRCNNPredictor
+
+        weights_path = Path("best_maskrcnn_stopline.pt")
+        if not weights_path.exists():
+            logger.warning(f"Chưa tìm thấy {weights_path}.")
+            return []
+
+        model = torchvision.models.detection.maskrcnn_resnet50_fpn(weights=None, weights_backbone=None)
+        in_features = model.roi_heads.box_predictor.cls_score.in_features
+        model.roi_heads.box_predictor = FastRCNNPredictor(in_features, num_classes=3)
+        in_features_mask = model.roi_heads.mask_predictor.conv5_mask.in_channels
+        model.roi_heads.mask_predictor = MaskRCNNPredictor(in_features_mask, dim_reduced=256, num_classes=3)
+        model.load_state_dict(torch.load(str(weights_path), map_location="cpu"))
+        model.eval()
+
+        img_in = cv2.resize(bg_frame, (384, 384))
+        img_tensor = torch.from_numpy(img_in[:, :, ::-1].copy()).permute(2, 0, 1).float() / 255.0
+
+        with torch.no_grad():
+            preds = model([img_tensor])[0]
+
+        pred_boxes = preds["boxes"].cpu().numpy()
+        pred_labels = preds["labels"].cpu().numpy()
+        pred_scores = preds["scores"].cpu().numpy()
+
+        scale_y = h / 384.0
+        selected = []
+        for box, lbl, score in zip(pred_boxes, pred_labels, pred_scores):
+            if lbl != 1 or score < 0.20:
+                continue
+            y1 = int(box[1] * scale_y)
+            y2 = int(box[3] * scale_y)
+            avg_y = int((y1 + y2) / 2)
+
+            if any(abs(avg_y - s["line"][0][1]) < self.secondary_dist_thresh for s in selected):
+                continue
+            direction = "TOP_TO_BOTTOM" if avg_y < h * 0.55 else "BOTTOM_TO_TOP"
+            line_idx = len(selected) + 1
+            selected.append({
+                "id": f"stop_line_{line_idx}",
+                "name": f"Vach {line_idx} (Mask R-CNN - Y={avg_y})",
+                "line": [(0, avg_y), (w - 1, avg_y)],
+                "direction": direction,
+                "confidence": round(float(score), 3),
+                "method": "ai_maskrcnn_segmentation"
+            })
+            if len(selected) >= self.max_lines:
+                break
         return selected
 
     # =========================================================================
