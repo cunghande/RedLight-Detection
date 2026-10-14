@@ -76,8 +76,8 @@ stopline_detector:
     selection:
       min_confidence_thresh: 0.52 # ngưỡng điểm tối thiểu để tự động chọn (dưới mức này sẽ cảnh báo và yêu cầu xác nhận)
       top_k_candidates: 5 # lưu và hiển thị top-5 ứng viên sáng giá nhất
-      max_lines: 1 # mặc định 1 vạch dừng chính
-      secondary_distance_thresh: 220 # khoảng cách tối thiểu nếu có vạch thứ 2
+      max_lines: 2 # hỗ trợ tự động chọn đến 2 vạch nếu video có 2 vạch (vạch dừng + vạch đi bộ)
+      secondary_distance_thresh: 48 # khoảng cách tối thiểu giữa 2 vạch (px)
 
   # Cấu hình Chế độ B - Model AI (YOLO-seg)
   ai:

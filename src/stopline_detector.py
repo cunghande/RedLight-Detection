@@ -49,6 +49,8 @@ class StopLineDetector:
         sel_cfg = classical_cfg.get("selection", {})
         self.min_confidence = sel_cfg.get("min_confidence_thresh", 0.52)
         self.top_k = sel_cfg.get("top_k_candidates", 5)
+        self.max_lines = sel_cfg.get("max_lines", 2)
+        self.secondary_dist_thresh = sel_cfg.get("secondary_distance_thresh", 48)
 
         # Trajectory analyzer
         self.traj_analyzer = TrajectoryAnalyzer(
@@ -451,22 +453,61 @@ class StopLineDetector:
             warn_img_path = f"debug_warning_top5_{camera_id}.jpg"
             self._draw_top_k_warning_image(bg_frame, scored_candidates[:self.top_k], warn_img_path, camera_id)
 
-        # Làm phẳng vạch theo mặt đường ngang (dy <= 6px)
-        p1, p2 = best["p1"], best["p2"]
-        avg_y = int((p1[1] + p2[1]) / 2)
-        final_line = [(p1[0], avg_y), (p2[0], avg_y)]
+        # Chọn danh sách vạch dừng hợp lệ (hỗ trợ tự động 1 hoặc 2 vạch nếu có vạch thứ 2 hợp lệ)
+        selected = []
+        for cand in scored_candidates:
+            if len(selected) >= self.max_lines:
+                break
 
-        direction = "TOP_TO_BOTTOM" if avg_y < h * 0.55 else "BOTTOM_TO_TOP"
-        selected = [{
-            "id": "stop_line_1",
-            "name": f"Vach dung (Chon tu dong - Y={avg_y})",
-            "line": final_line,
-            "direction": direction,
-            "confidence": best["total_score"],
-            "method": "candidate_scoring_selection"
-        }]
+            if cand["total_score"] < self.min_confidence:
+                continue
 
-        logger.info(f"[KẾT QUẢ CHỌN] Vạch dừng tốt nhất: {final_line} (Điểm số: {best['total_score']})\n")
+            p1, p2 = cand["p1"], cand["p2"]
+            avg_y = int((p1[1] + p2[1]) / 2)
+
+            # Kiểm tra khoảng cách với các vạch đã chọn trước đó
+            too_close = False
+            for prev in selected:
+                prev_y = int((prev["line"][0][1] + prev["line"][1][1]) / 2)
+                if abs(avg_y - prev_y) < self.secondary_dist_thresh:
+                    too_close = True
+                    break
+
+            if too_close:
+                continue
+
+            final_line = [(p1[0], avg_y), (p2[0], avg_y)]
+            line_idx = len(selected) + 1
+            direction = "TOP_TO_BOTTOM" if avg_y < h * 0.55 else "BOTTOM_TO_TOP"
+
+            selected.append({
+                "id": f"stop_line_{line_idx}",
+                "name": f"Vach {line_idx} (Chon tu dong - Y={avg_y})",
+                "line": final_line,
+                "direction": direction,
+                "confidence": cand["total_score"],
+                "method": "candidate_scoring_selection"
+            })
+
+        # Fallback nếu không có vạch nào vượt ngưỡng
+        if not selected and scored_candidates:
+            p1, p2 = best["p1"], best["p2"]
+            avg_y = int((p1[1] + p2[1]) / 2)
+            direction = "TOP_TO_BOTTOM" if avg_y < h * 0.55 else "BOTTOM_TO_TOP"
+            selected.append({
+                "id": "stop_line_1",
+                "name": f"Vach dung (Chon tu dong - Y={avg_y})",
+                "line": [(p1[0], avg_y), (p2[0], avg_y)],
+                "direction": direction,
+                "confidence": best["total_score"],
+                "method": "candidate_scoring_selection"
+            })
+
+        logger.info(f"[KẾT QUẢ CHỌN] Đã tự động chọn {len(selected)} vạch dừng:")
+        for s in selected:
+            logger.info(f"   -> {s['name']}: {s['line']} (Điểm số: {s['confidence']})")
+        logger.info("")
+
         return selected
 
     # =========================================================================
