@@ -65,48 +65,49 @@ pip install -r requirements.txt
 
 ## 4. HƯỚNG DẪN SỬ DỤNG
 
-### 4.1. Chạy hệ thống phát hiện vi phạm (`main.py`)
+### 4.1. Lệnh Đề Xuất Đạt Độ Chính Xác Cao Nhất (Best Accuracy - Mask R-CNN)
+Khuyên dùng cho mọi kịch bản thời tiết phức tạp (mưa ướt, bóng nước loang, xe đông đúc). Kiến trúc Two-Stage RoIAlign kết hợp thuật toán khớp viễn cảnh nghiêng tự nhiên `cv2.fitLine` giúp bám sát vạch sơn thật và triệt tiêu 100% vạch ảo cắt ngang xe:
 
 ```bash
-# 1. Chạy tự động quét vạch bằng Chế độ A (Classical Baseline)
-python main.py --video dataset_videos/red1.mp4 --camera-id cam_red1 --mode classical
+# Giao lộ có 1 vạch dừng (Ví dụ: red1.mp4, red2.mp4)
+python main.py --video dataset_videos/red1.mp4 --camera-id cam_red1 --mode ai --ai-model maskrcnn --redetect --max-lines 1
 
-# 2. Chạy với Model AI YOLOv8n-seg (Khuyến nghị thực tế, siêu nhanh)
-python main.py --video dataset_videos/red1.mp4 --camera-id cam_red1 --mode ai --ai-model yolo
-
-# 3. Chạy với Model AI DeepLabV3+ (Pixel-level Semantic Segmentation, bắt trọn vệt sơn mờ)
-python main.py --video dataset_videos/red1.mp4 --camera-id cam_red1 --mode ai --ai-model deeplabv3
-
-# 4. Chạy với Model AI Mask R-CNN (Two-stage Instance Segmentation, chống nhiễu bóng nước)
-python main.py --video dataset_videos/red1.mp4 --camera-id cam_red1 --mode ai --ai-model maskrcnn
-
-# 5. Ép buộc quét lại vạch mới (bỏ qua cache) & bật chống rung lắc Homography
-python main.py --video dataset_videos/red2.mp4 --camera-id cam_red2 --mode ai --ai-model yolo --redetect --stabilize
-
-# 6. Chạy chế độ ngầm (headless) xuất video vi phạm
-python main.py --video dataset_videos/red1.mp4 --mode ai --ai-model yolo --headless --output output_red1.mp4
+# Giao lộ ngã tư đôi có 2 vạch dừng (Ví dụ: red4.mp4)
+python main.py --video dataset_videos/red4.mp4 --camera-id cam_red4 --mode ai --ai-model maskrcnn --redetect --max-lines 2
 ```
 
-### 4.2. Chế độ bán tự động xem trước & xác nhận (`preview_stopline.py`)
-
-Xem trước vạch dừng do từng model AI đề xuất và xác nhận lưu vào cấu hình camera:
+### 4.2. Lệnh Tốc Độ Cao Cho Thời Gian Thực (Fast Real-Time - YOLOv8n-seg)
+Khuyên dùng khi triển khai thực tế trên thiết bị biên (Edge Device) hoặc cần FPS cao (> 35 FPS):
 
 ```bash
-# Xem trước với YOLOv8-seg (Mặc định)
-python preview_stopline.py --video dataset_videos/red1.mp4 --camera-id cam_red1 --ai-model yolo
-
-# Xem trước với DeepLabV3+
-python preview_stopline.py --video dataset_videos/red1.mp4 --camera-id cam_red1 --ai-model deeplabv3
-
-# Xem trước với Mask R-CNN
-python preview_stopline.py --video dataset_videos/red1.mp4 --camera-id cam_red1 --ai-model maskrcnn
+python main.py --video dataset_videos/red1.mp4 --camera-id cam_red1 --mode ai --ai-model yolo --max-lines 1
 ```
-- **Click chuột trái 2 điểm**: Chỉnh sửa/vẽ lại vạch nếu muốn.
-- **Phím `[s]`**: Xác nhận và lưu vạch vào `configs/cam_red1.json`.
-- **Phím `[r]`**: Khôi phục lại vạch do mô hình AI đề xuất.
-- **Phím `[q]`**: Thoát mà không lưu.
 
-### 4.3. Huấn luyện các Model AI Phân Đoạn Vạch Dừng
+### 4.3. Xem Trước & Xác Nhận Vạch Bán Tự Động (`preview_stopline.py`)
+Mở cửa sổ trực quan để kiểm tra vạch AI phát hiện trước khi đưa vào giám sát tự động:
+
+```bash
+# Xem trước với Mask R-CNN đạt độ chuẩn xác cao nhất (Khuyên dùng)
+python preview_stopline.py --video dataset_videos/red1.mp4 --camera-id cam_red1 --mode ai --ai-model maskrcnn --redetect --max-lines 1
+
+# Kiểm tra video 2 vạch dừng
+python preview_stopline.py --video dataset_videos/red4.mp4 --camera-id cam_red4 --mode ai --ai-model maskrcnn --redetect --max-lines 2
+```
+* **Phím `[s]`**: Xác nhận và lưu cấu hình vạch vào `configs/<camera_id>.json` (các lần chạy sau sẽ đọc ngay từ cache).
+* **Phím `[r]`**: Khôi phục lại vạch do mô hình AI đề xuất.
+* **Click chuột 2 điểm**: Tự vẽ lại vạch theo ý muốn nếu cần tinh chỉnh thủ công.
+* **Phím `[q]`**: Thoát cửa sổ xem trước.
+
+### 4.4. Các Tham Số Quan Trọng Giúp Tăng Độ Chính Xác
+| Tham số | Ý nghĩa & Tác dụng tăng độ chính xác |
+| :--- | :--- |
+| `--ai-model maskrcnn` | Dùng model Two-Stage ResNet50-FPN; lọc sạch nhiễu bóng đèn xe phản chiếu trên mặt đường ướt (mAP@50 đạt 85.0%). |
+| `--max-lines 1` hoặc `2` | Khóa số lượng vạch dừng thực tế của làn đường; loại bỏ hoàn toàn việc vẽ thêm vạch ảo cắt ngang thân xe. |
+| `--redetect` | Ép buộc quét lại vạch mới (bỏ qua cache cũ), áp dụng thuật toán khớp độ dốc viễn cảnh `cv2.fitLine`. |
+| `--stabilize` | Bật module ổn định hóa camera bằng ma trận Homography; triệt tiêu rung lắc do gió hoặc rung chấn từ xe tải lớn. |
+| `--headless` | Chạy ngầm không mở cửa sổ GUI; tối ưu hiệu năng và lưu thẳng video bằng chứng ra `output_violation.mp4`. |
+
+### 4.5. Huấn luyện các Model AI Phân Đoạn Vạch Dừng
 
 #### A. Huấn luyện mô hình YOLOv8-seg (`train_stopline.py`)
 ```bash
@@ -130,7 +131,7 @@ python train_comparative_models.py --epochs-deeplab 10 --epochs-maskrcnn 5 --bat
 4. Vẽ polygon viền quanh các dải vạch sơn trắng.
 5. Export định dạng **YOLOv8 Segmentation** và đặt vào thư mục `dataset_stopline/`.
 
-### 4.4. Đánh giá độ chính xác & Benchmark (`evaluate.py`)
+### 4.6. Đánh giá độ chính xác & Benchmark (`evaluate.py`)
 
 Đo lường sai số pixel, IoU và chỉ số F1-Score so với ground truth thực tế:
 
