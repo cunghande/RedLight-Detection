@@ -119,6 +119,7 @@ class TrajectoryAnalyzer:
 
         # 1. TÍNH HƯỚNG CHUYỂN ĐỘNG CHỦ ĐẠO (DOMINANT TRAFFIC FLOW)
         motion_vectors = []
+        motion_weights = []
         all_bottom_points = []
 
         for tid, pts in trajectories.items():
@@ -128,12 +129,13 @@ class TrajectoryAnalyzer:
                 p_start = np.array(pts[0], dtype=np.float32)
                 p_end = np.array(pts[-1], dtype=np.float32)
                 vec = p_end - p_start
-                dist = np.linalg.norm(vec)
+                dist = float(np.linalg.norm(vec))
 
                 # Nếu xe di chuyển quãng đường đáng kể
                 if dist >= self.min_displacement:
                     unit_vec = vec / dist
                     motion_vectors.append(unit_vec)
+                    motion_weights.append(dist)
 
                 # Kiểm tra xe đứng yên (vận tốc trung bình rất thấp)
                 speeds = frame_speeds.get(tid, [])
@@ -143,14 +145,15 @@ class TrajectoryAnalyzer:
 
         if len(motion_vectors) > 0:
             motion_arr = np.array(motion_vectors)
-            # Trung vị vector chuyển động để loại nhiễu rẽ nhánh
-            med_dx = float(np.median(motion_arr[:, 0]))
-            med_dy = float(np.median(motion_arr[:, 1]))
-            norm = np.hypot(med_dx, med_dy)
+            # Trọng số theo quãng đường di chuyển (xe đi xa phản ánh đúng dòng đường chính)
+            weights_arr = np.array(motion_weights)
+            weighted_dx = float(np.average(motion_arr[:, 0], weights=weights_arr))
+            weighted_dy = float(np.average(motion_arr[:, 1], weights=weights_arr))
+            norm = np.hypot(weighted_dx, weighted_dy)
             if norm > 1e-4:
-                flow_vector = (med_dx / norm, med_dy / norm)
+                flow_vector = (weighted_dx / norm, weighted_dy / norm)
             else:
-                flow_vector = (0.0, 1.0) # Mặc định xe đi từ trên xuống
+                flow_vector = (0.0, 1.0)
         else:
             flow_vector = (0.0, 1.0)
 

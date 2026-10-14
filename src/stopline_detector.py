@@ -42,6 +42,7 @@ class StopLineDetector:
         self.w_traj = weights_cfg.get("trajectory_intersection", 0.25)
         self.w_stop = weights_cfg.get("stopped_cluster_distance", 0.20)
         self.w_len = weights_cfg.get("relative_length", 0.15)
+        self.w_contrast = weights_cfg.get("paint_contrast", 0.10)
         self.w_crosswalk = weights_cfg.get("crosswalk_relation", 0.05)
 
         # Ngưỡng chọn
@@ -130,7 +131,7 @@ class StopLineDetector:
             return []
 
         # 3. Chấm điểm từng ứng viên theo đa tiêu chí
-        scored_candidates = self._score_candidates(candidates, motion_info)
+        scored_candidates = self._score_candidates(candidates, motion_info, bg_frame)
 
         # 4. Xuất ảnh debug nếu được yêu cầu
         if debug:
@@ -156,8 +157,9 @@ class StopLineDetector:
         if not frames:
             return [], np.zeros((1080, 1080, 3), dtype=np.uint8)
 
-        # Ảnh nền tĩnh bằng median
-        bg_frame = np.median(frames[:8], axis=0).astype(np.uint8)
+        # Ảnh nền tĩnh bằng median trải đều trên toàn bộ khung hình mẫu
+        sample_step = max(1, len(frames) // 25)
+        bg_frame = np.median(frames[::sample_step][:25], axis=0).astype(np.uint8)
 
         # Vùng xét mặt đường ROI
         roi_top = int(H * self.roi_y_min)
@@ -257,10 +259,16 @@ class StopLineDetector:
 
             mid_x = (min_x + max_x) / 2
             mid_y = int(grp['ym'])
-            y1 = int(round(mid_y + slope * (min_x - mid_x)))
-            y2 = int(round(mid_y + slope * (max_x - mid_x)))
+            
+            # Mở rộng vạch ra toàn bề rộng mặt đường (0 -> W-1) để nối liền vạch bị xe che khuất
+            ext_x1 = 0
+            ext_x2 = W - 1
+            ext_y1 = int(round(mid_y + slope * (ext_x1 - mid_x)))
+            ext_y2 = int(round(mid_y + slope * (ext_x2 - mid_x)))
+            ext_y1 = max(0, min(H - 1, ext_y1))
+            ext_y2 = max(0, min(H - 1, ext_y2))
 
-            midpoint = (int(mid_x), int(mid_y))
+            midpoint = (int((ext_x1 + ext_x2) / 2), int((ext_y1 + ext_y2) / 2))
 
             # Bỏ ứng viên nằm ngoài Road ROI
             if road_mask is not None:
@@ -268,16 +276,18 @@ class StopLineDetector:
                 if road_mask[my, mx] == 0:
                     continue # Bỏ qua vì nằm ngoài vùng xe chạy
 
-            dx = max_x - min_x
-            dy = y2 - y1
+            dx = ext_x2 - ext_x1
+            dy = ext_y2 - ext_y1
             length = float(np.hypot(dx, dy))
             angle_rad = float(np.arctan2(dy, dx))
             angle_deg = float(np.degrees(angle_rad))
 
             candidates.append({
                 "id": f"cand_{idx+1}",
-                "p1": (int(min_x), y1),
-                "p2": (int(max_x), y2),
+                "p1": (ext_x1, ext_y1),
+                "p2": (ext_x2, ext_y2),
+                "orig_p1": (int(min_x), y1 if 'y1' in locals() else ext_y1),
+                "orig_p2": (int(max_x), y2 if 'y2' in locals() else ext_y2),
                 "midpoint": midpoint,
                 "length": length,
                 "span_x": span_x,
@@ -291,11 +301,17 @@ class StopLineDetector:
     # =========================================================================
     # 2. CHẤM ĐIỂM ĐA TIÊU CHÍ (MULTI-CRITERIA SCORING)
     # =========================================================================
-    def _score_candidates(self, candidates: List[Dict], motion_info: Dict) -> List[Dict]:
+    def _score_candidates(self, candidates: List[Dict], motion_info: Dict, bg_frame: Optional[np.ndarray] = None) -> List[Dict]:
         flow_vec = motion_info.get("flow_vector", (0.0, 1.0)) # (ux, uy)
         trajectories = motion_info.get("trajectories", {})
         stopped_clusters = motion_info.get("stopped_clusters", [])
         h, w = motion_info.get("frame_shape", (1080, 1080))
+
+        # Tính bản đồ tương phản biên cạnh dọc (Sobel Y) trên ảnh nền mặt đường
+        sobel_y = None
+        if bg_frame is not None:
+            gray = cv2.cvtColor(bg_frame, cv2.COLOR_BGR2GRAY) if len(bg_frame.shape) == 3 else bg_frame
+            sobel_y = np.abs(cv2.Sobel(gray, cv2.CV_64F, 0, 1))
 
         scored_list = []
 
@@ -313,35 +329,58 @@ class StopLineDetector:
             if s_angle < 0.40:
                 s_angle *= 0.2
 
-            # --- Tiêu chí 2: Số quỹ đạo xe cắt qua ứng viên ---
+            # --- Tiêu chí 2: Số quỹ đạo xe di chuyển thực tế cắt qua ứng viên ---
             intersecting_count = 0
+            moving_tracks_count = 0
             for tid, pts in trajectories.items():
                 if len(pts) >= 4:
-                    # Kiểm tra xem đường đi xe có cắt đoạn thẳng p1-p2 không
-                    if self._check_trajectory_intersects_line(pts, p1, p2):
-                        intersecting_count += 1
+                    disp = float(np.linalg.norm(np.array(pts[-1], dtype=float) - np.array(pts[0], dtype=float)))
+                    if disp >= 35.0: # Chỉ xét xe thực sự di chuyển (loại bỏ xe đứng yên rung lắc)
+                        moving_tracks_count += 1
+                        if self._check_trajectory_intersects_line(pts, p1, p2):
+                            intersecting_count += 1
 
-            total_tracks = max(1, len(trajectories))
-            s_traj = float(min(1.0, intersecting_count / max(1, 0.35 * total_tracks)))
+            total_moving = max(1, moving_tracks_count)
+            s_traj = float(min(1.0, intersecting_count / max(1, 0.35 * total_moving)))
 
-            # --- Tiêu chí 3: Khoảng cách tới cụm xe dừng (Ngay trước xe dừng) ---
+            # --- Tiêu chí 3: Khoảng cách tới cụm xe dừng (Ngay trước đầu xe dừng) ---
             s_stop = 0.5 # Giá trị trung lập mặc định nếu không có xe dừng
             if stopped_clusters:
-                best_stop_dist = float("inf")
+                dx = p2[0] - p1[0]
+                dy = p2[1] - p1[1]
+                slope = dy / dx if dx != 0 else 0.0
+                best_stop_score = 0.0
+                has_front_car = False
+
                 for cl in stopped_clusters:
                     c_pt = cl["center"]
-                    # Khoảng cách theo chiều dòng xe
-                    dist_along_flow = (midpoint[0] - c_pt[0]) * flow_vec[0] + (midpoint[1] - c_pt[1]) * flow_vec[1]
-                    # Vạch dừng lý tưởng nằm phía trước xe dừng 20 - 80px
-                    if 10 <= dist_along_flow <= 100:
-                        score_cl = float(np.exp(-((dist_along_flow - 45) ** 2) / (2 * (35 ** 2))))
-                        s_stop = max(s_stop, score_cl)
+                    # Tọa độ Y của vạch ngay tại vị trí X của xe dừng
+                    line_y_at_car = p1[1] + slope * (c_pt[0] - p1[0])
+                    vert_dist = float(line_y_at_car - c_pt[1])
+                    dist_along_flow = vert_dist * float(flow_vec[1])
+
+                    # Vạch dừng chuẩn nằm ngay phía trước đầu xe dừng 25 - 250px theo chiều tiến
+                    if 20 <= dist_along_flow <= 260:
+                        score_cl = float(np.exp(-((dist_along_flow - 90) ** 2) / (2 * (55 ** 2))))
+                        if score_cl > best_stop_score:
+                            best_stop_score = score_cl
+                            has_front_car = True
+
+                if has_front_car:
+                    s_stop = best_stop_score
+                else:
+                    s_stop = 0.30
 
             # --- Tiêu chí 4: Độ dài tương đối so với bề rộng mặt đường ---
-            s_len = float(min(1.0, cand["length"] / (w * 0.65)))
+            s_len = float(min(1.0, cand["span_x"] / (w * 0.50)))
 
-            # --- Tiêu chí 5: Quan hệ với vạch đi bộ (Mặc định trung lập 0.5) ---
-            s_crosswalk = 0.5
+            # --- Tiêu chí 5: Độ tương phản biên cạnh vạch sơn thật (Loại vệt loang nước) ---
+            s_contrast = 0.5
+            if sobel_y is not None:
+                mask = np.zeros(sobel_y.shape, dtype=np.uint8)
+                cv2.line(mask, p1, p2, 255, 6)
+                mean_contrast = float(cv2.mean(sobel_y, mask=mask)[0])
+                s_contrast = float(min(1.0, mean_contrast / 5.0))
 
             # Tổng điểm có trọng số
             total_score = (
@@ -349,7 +388,7 @@ class StopLineDetector:
                 self.w_traj * s_traj +
                 self.w_stop * s_stop +
                 self.w_len * s_len +
-                self.w_crosswalk * s_crosswalk
+                self.w_contrast * s_contrast
             )
             total_score = round(float(total_score), 3)
 
@@ -359,7 +398,7 @@ class StopLineDetector:
                 "s_traj": round(s_traj, 3),
                 "s_stop": round(s_stop, 3),
                 "s_len": round(s_len, 3),
-                "s_crosswalk": round(s_crosswalk, 3)
+                "s_contrast": round(s_contrast, 3)
             }
             cand_result["intersecting_tracks"] = intersecting_count
             cand_result["total_score"] = total_score
@@ -391,15 +430,15 @@ class StopLineDetector:
 
         # In bảng điểm top-5 ứng viên ra terminal
         logger.info(f"\n--- BẢNG ĐIỂM TOP-{min(self.top_k, len(scored_candidates))} ỨNG VIÊN VẠCH DỪNG CHO '{camera_id}' ---")
-        logger.info(f"{'ID':<8} | {'Tọa độ (p1 -> p2)':<30} | {'Góc(S_ang)':<10} | {'Quỹ đạo(S_tr)':<13} | {'Xe dừng(S_st)':<13} | {'Độ dài(S_len)':<13} | {'TỔNG ĐIỂM':<10}")
-        logger.info("-" * 110)
+        logger.info(f"{'ID':<8} | {'Tọa độ (p1 -> p2)':<28} | {'Góc(S_ang)':<10} | {'Quỹ đạo(S_tr)':<13} | {'Xe dừng(S_st)':<13} | {'Độ dài(S_len)':<13} | {'Tương phản(S_cnt)':<15} | {'TỔNG ĐIỂM':<10}")
+        logger.info("-" * 128)
 
         for cand in scored_candidates[:self.top_k]:
             sc = cand["sub_scores"]
             coord_str = f"({cand['p1'][0]},{cand['p1'][1]})->({cand['p2'][0]},{cand['p2'][1]})"
             logger.info(
-                f"{cand['id']:<8} | {coord_str:<30} | {sc['s_angle']:<10.2f} | {sc['s_traj']:<13.2f} | "
-                f"{sc['s_stop']:<13.2f} | {sc['s_len']:<13.2f} | {cand['total_score']:<10.3f}"
+                f"{cand['id']:<8} | {coord_str:<28} | {sc['s_angle']:<10.2f} | {sc['s_traj']:<13.2f} | "
+                f"{sc['s_stop']:<13.2f} | {sc['s_len']:<13.2f} | {sc.get('s_contrast', 0.5):<15.2f} | {cand['total_score']:<10.3f}"
             )
 
         # Kiểm tra ngưỡng tin cậy

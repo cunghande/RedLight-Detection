@@ -68,11 +68,11 @@ stopline_detector:
       max_candidates: 30 # số ứng viên tối đa sinh ra
     # HỆ THỐNG CHẤM ĐIỂM ĐA TIÊU CHÍ (MULTI-CRITERIA SCORING)
     scoring_weights:
-      angle_perpendicular: 0.35 # vạch vuông góc với dòng xe (song song bị loại)
+      angle_perpendicular: 0.30 # vạch vuông góc với dòng xe (song song bị loại)
       trajectory_intersection: 0.25 # số quỹ đạo xe cắt qua vạch
       stopped_cluster_distance: 0.20 # nằm ngay trước cụm xe dừng
       relative_length: 0.15 # chiều dài so với bề rộng mặt đường
-      crosswalk_relation: 0.05 # nằm trước vạch đi bộ
+      paint_contrast: 0.10 # độ tương phản biên cạnh vạch sơn thật (loại bóng nước/vệt phản chiếu)
     selection:
       min_confidence_thresh: 0.52 # ngưỡng điểm tối thiểu để tự động chọn (dưới mức này sẽ cảnh báo và yêu cầu xác nhận)
       top_k_candidates: 5 # lưu và hiển thị top-5 ứng viên sáng giá nhất

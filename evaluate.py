@@ -13,7 +13,7 @@ logger = logging.getLogger("Evaluate")
 
 # Tọa độ vạch dừng gán nhãn thủ công (Ground Truth) để đánh giá benchmark
 GROUND_TRUTH_LINES = {
-    "red1.mp4": [(190, 560), (1030, 560)],
+    "red1.mp4": [(0, 650), (1079, 625)],
     "red2.mp4": [(0, 575), (1067, 575)],
     "red3.mp4": [(0, 650), (1079, 650)],
     "red4.mp4": [(100, 565), (1025, 565)],
