@@ -69,6 +69,7 @@ def run_pipeline(
     mode: str = "classical",
     ai_model: str = "yolo",
     redetect: bool = False,
+    max_lines: Optional[int] = None,
     output_video: Optional[str] = "output_violation.mp4",
     stabilize: bool = False,
     headless: bool = False,
@@ -90,6 +91,7 @@ def run_pipeline(
         mode=mode,
         ai_model=ai_model,
         redetect=redetect,
+        max_lines=max_lines,
         debug=debug
     )
 
@@ -254,6 +256,7 @@ if __name__ == "__main__":
     parser.add_argument("--mode", type=str, default="classical", choices=["classical", "ai"], help="Chế độ quét vạch dừng (classical / ai)")
     parser.add_argument("--ai-model", type=str, default="yolo", choices=["yolo", "deeplabv3", "maskrcnn"], help="Kiến trúc AI phân đoạn (yolo, deeplabv3, maskrcnn)")
     parser.add_argument("--redetect", action="store_true", help="Bỏ qua cache và ép buộc quét lại vạch mới")
+    parser.add_argument("--max-lines", type=int, default=None, help="Số lượng vạch dừng tối đa cần phát hiện (1 hoặc 2)")
     parser.add_argument("--output", type=str, default="output_violation.mp4", help="Đường dẫn lưu video kết quả")
     parser.add_argument("--stabilize", action="store_true", help="Bật chống rung lắc camera bằng Homography")
     parser.add_argument("--headless", action="store_true", help="Chạy chế độ ngầm không mở cửa sổ giao diện")
@@ -266,6 +269,7 @@ if __name__ == "__main__":
         mode=args.mode,
         ai_model=args.ai_model,
         redetect=args.redetect,
+        max_lines=args.max_lines,
         output_video=args.output,
         stabilize=args.stabilize,
         headless=args.headless,

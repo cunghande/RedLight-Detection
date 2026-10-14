@@ -108,6 +108,7 @@ class StopLineDetector:
         mode: str = "classical",
         ai_model: str = "yolo",
         redetect: bool = False,
+        max_lines: Optional[int] = None,
         debug: bool = False
     ) -> List[Dict]:
         source_name = str(video_source)
@@ -120,7 +121,7 @@ class StopLineDetector:
                 return cached
 
         if mode == "ai":
-            return self._detect_ai(video_source, camera_id=camera_id, ai_model=ai_model, debug=debug)
+            return self._detect_ai(video_source, camera_id=camera_id, ai_model=ai_model, max_lines=max_lines, debug=debug)
 
         logger.info(f"Thực hiện phát hiện vạch dừng: SINH ỨNG VIÊN -> CHẤM ĐIỂM -> CHỌN cho '{camera_id}'...")
 
@@ -157,10 +158,12 @@ class StopLineDetector:
         video_source: Union[str, Path, cv2.VideoCapture],
         camera_id: str,
         ai_model: str = "yolo",
+        max_lines: Optional[int] = None,
         debug: bool = False
     ) -> List[Dict]:
         """Phát hiện vạch dừng bằng các kiến trúc Học sâu: YOLOv8-seg, DeepLabV3+, Mask R-CNN"""
-        logger.info(f"Thực hiện phát hiện vạch dừng bằng AI SEGMENTATION ({ai_model.upper()}) cho '{camera_id}'...")
+        effective_max = max_lines if max_lines is not None else self.max_lines
+        logger.info(f"Thực hiện phát hiện vạch dừng bằng AI SEGMENTATION ({ai_model.upper()}) cho '{camera_id}' (max_lines={effective_max})...")
 
         frames, h, w = self._sample_video_frames(video_source, 20)
         if not frames:
@@ -170,9 +173,9 @@ class StopLineDetector:
         selected = []
 
         if ai_model.lower() == "deeplabv3":
-            selected = self._detect_deeplabv3(bg_frame, h, w)
+            selected = self._detect_deeplabv3(bg_frame, h, w, max_lines=effective_max)
         elif ai_model.lower() == "maskrcnn":
-            selected = self._detect_maskrcnn(bg_frame, h, w)
+            selected = self._detect_maskrcnn(bg_frame, h, w, max_lines=effective_max)
         else: # Mặc định: YOLOv8-seg
             weights_path = Path("best_stopline_seg.pt")
             if not weights_path.exists():
@@ -186,15 +189,21 @@ class StopLineDetector:
                     cls_id = int(box.cls[0])
                     conf = float(box.conf[0])
 
-                    if len(mask_xy) < 3:
+                    if len(mask_xy) < 4:
                         continue
 
                     poly = np.array(mask_xy, dtype=np.int32)
-                    min_y = int(np.min(poly[:, 1]))
-                    max_y = int(np.max(poly[:, 1]))
-                    avg_y = int((min_y + max_y) / 2)
+                    # Khớp đường thẳng có góc nghiêng phối cảnh thực tế
+                    [vx, vy, x0, y0] = cv2.fitLine(poly, cv2.DIST_L2, 0, 0.01, 0.01)
+                    vx, vy, x0, y0 = float(vx[0]), float(vy[0]), float(x0[0]), float(y0[0])
+                    slope = vy / vx if abs(vx) > 1e-4 else 0.0
+                    y_left = int(round(y0 - (x0 * slope)))
+                    y_right = int(round(y0 + ((w - 1 - x0) * slope)))
+                    avg_y = int(round((y_left + y_right) / 2))
 
-                    if any(abs(avg_y - int((prev['line'][0][1] + prev['line'][1][1]) / 2)) < self.secondary_dist_thresh for prev in selected):
+                    # Khoảng cách tối thiểu 80px để tránh vạch đè lên thân xe
+                    min_sep = max(self.secondary_dist_thresh, 80)
+                    if any(abs(avg_y - int((prev['line'][0][1] + prev['line'][1][1]) / 2)) < min_sep for prev in selected):
                         continue
 
                     direction = "TOP_TO_BOTTOM" if avg_y < h * 0.55 else "BOTTOM_TO_TOP"
@@ -202,13 +211,13 @@ class StopLineDetector:
                     selected.append({
                         "id": f"stop_line_{line_idx}",
                         "name": f"Vach {line_idx} (YOLOv8-seg - Y={avg_y})",
-                        "line": [(0, avg_y), (w - 1, avg_y)],
+                        "line": [(0, y_left), (w - 1, y_right)],
                         "direction": direction,
                         "confidence": round(conf, 3),
                         "method": "ai_yolo_segmentation"
                     })
 
-                    if len(selected) >= self.max_lines:
+                    if len(selected) >= effective_max:
                         break
 
         if debug:
@@ -232,7 +241,7 @@ class StopLineDetector:
 
         return selected
 
-    def _detect_deeplabv3(self, bg_frame: np.ndarray, h: int, w: int) -> List[Dict]:
+    def _detect_deeplabv3(self, bg_frame: np.ndarray, h: int, w: int, max_lines: int = 2) -> List[Dict]:
         """Phát hiện vạch dừng bằng DeepLabV3+ (Pixel-level Semantic Segmentation)"""
         import torch
         import torchvision
@@ -261,15 +270,17 @@ class StopLineDetector:
         mask_orig = cv2.resize((pred_mask == 1).astype(np.uint8), (w, h), interpolation=cv2.INTER_NEAREST)
         y_hist = np.sum(mask_orig, axis=1)
 
+        # Giới hạn dải tìm kiếm tránh bóng nước mưa ở phần trên giao lộ
         peaks = []
-        for y in range(int(h * 0.45), int(h * 0.85)):
+        for y in range(int(h * 0.52), int(h * 0.85)):
             if y_hist[y] > w * 0.15 and y_hist[y] == np.max(y_hist[max(0, y-25):min(h, y+26)]):
                 peaks.append((y, int(y_hist[y])))
 
         peaks.sort(key=lambda x: x[1], reverse=True)
         selected = []
         for y, count in peaks:
-            if any(abs(y - s["line"][0][1]) < self.secondary_dist_thresh for s in selected):
+            min_sep = max(self.secondary_dist_thresh, 80)
+            if any(abs(y - s["line"][0][1]) < min_sep for s in selected):
                 continue
             direction = "TOP_TO_BOTTOM" if y < h * 0.55 else "BOTTOM_TO_TOP"
             line_idx = len(selected) + 1
@@ -282,11 +293,11 @@ class StopLineDetector:
                 "confidence": conf,
                 "method": "ai_deeplabv3_segmentation"
             })
-            if len(selected) >= self.max_lines:
+            if len(selected) >= max_lines:
                 break
         return selected
 
-    def _detect_maskrcnn(self, bg_frame: np.ndarray, h: int, w: int) -> List[Dict]:
+    def _detect_maskrcnn(self, bg_frame: np.ndarray, h: int, w: int, max_lines: int = 2) -> List[Dict]:
         """Phát hiện vạch dừng bằng Mask R-CNN (Two-Stage Proposal-based Instance Segmentation)"""
         import torch
         import torchvision
@@ -315,29 +326,49 @@ class StopLineDetector:
         pred_boxes = preds["boxes"].cpu().numpy()
         pred_labels = preds["labels"].cpu().numpy()
         pred_scores = preds["scores"].cpu().numpy()
+        pred_masks = preds["masks"].cpu().numpy()
 
         scale_y = h / 384.0
         selected = []
-        for box, lbl, score in zip(pred_boxes, pred_labels, pred_scores):
-            if lbl != 1 or score < 0.20:
+        for i, (box, lbl, score) in enumerate(zip(pred_boxes, pred_labels, pred_scores)):
+            if lbl != 1 or score < 0.35:
                 continue
-            y1 = int(box[1] * scale_y)
-            y2 = int(box[3] * scale_y)
-            avg_y = int((y1 + y2) / 2)
 
-            if any(abs(avg_y - s["line"][0][1]) < self.secondary_dist_thresh for s in selected):
+            # Sử dụng mask thực tế để tính góc nghiêng phối cảnh chính xác bằng cv2.fitLine
+            mask_inst = (pred_masks[i, 0] > 0.5).astype(np.uint8)
+            mask_orig = cv2.resize(mask_inst, (w, h), interpolation=cv2.INTER_NEAREST)
+            pts = np.argwhere(mask_orig > 0)
+            if len(pts) > 20:
+                pts = np.fliplr(pts) # [x, y]
+                [vx, vy, x0, y0] = cv2.fitLine(pts, cv2.DIST_L2, 0, 0.01, 0.01)
+                vx, vy, x0, y0 = float(vx[0]), float(vy[0]), float(x0[0]), float(y0[0])
+                slope = vy / vx if abs(vx) > 1e-4 else 0.0
+                y_left = int(round(y0 - (x0 * slope)))
+                y_right = int(round(y0 + ((w - 1 - x0) * slope)))
+                line_pts = [(0, y_left), (w - 1, y_right)]
+                avg_y = int(round((y_left + y_right) / 2))
+            else:
+                y1 = int(box[1] * scale_y)
+                y2 = int(box[3] * scale_y)
+                avg_y = int((y1 + y2) / 2)
+                line_pts = [(0, avg_y), (w - 1, avg_y)]
+
+            # Lọc chống gộp trùng: vạch thứ 2 phải cách xa tối thiểu 80px (tránh cắt qua thân xe)
+            min_sep = max(self.secondary_dist_thresh, 80)
+            if any(abs(avg_y - int((s["line"][0][1] + s["line"][1][1]) / 2)) < min_sep for s in selected):
                 continue
+
             direction = "TOP_TO_BOTTOM" if avg_y < h * 0.55 else "BOTTOM_TO_TOP"
             line_idx = len(selected) + 1
             selected.append({
                 "id": f"stop_line_{line_idx}",
                 "name": f"Vach {line_idx} (Mask R-CNN - Y={avg_y})",
-                "line": [(0, avg_y), (w - 1, avg_y)],
+                "line": line_pts,
                 "direction": direction,
                 "confidence": round(float(score), 3),
                 "method": "ai_maskrcnn_segmentation"
             })
-            if len(selected) >= self.max_lines:
+            if len(selected) >= max_lines:
                 break
         return selected
 

@@ -18,6 +18,7 @@ def preview_and_confirm(
     mode: str = "classical",
     ai_model: str = "yolo",
     redetect: bool = False,
+    max_lines: int = None,
     output_image: str = "preview_stopline.jpg",
     headless: bool = False,
     debug: bool = False
@@ -42,6 +43,7 @@ def preview_and_confirm(
         mode=mode,
         ai_model=ai_model,
         redetect=redetect,
+        max_lines=max_lines,
         debug=debug
     )
 
@@ -151,6 +153,7 @@ if __name__ == "__main__":
     parser.add_argument("--mode", type=str, default="classical", choices=["classical", "ai"], help="Chế độ quét vạch")
     parser.add_argument("--ai-model", type=str, default="yolo", choices=["yolo", "deeplabv3", "maskrcnn"], help="Kiến trúc AI phân đoạn (yolo, deeplabv3, maskrcnn)")
     parser.add_argument("--redetect", action="store_true", help="Bỏ qua cache và ép phát hiện lại")
+    parser.add_argument("--max-lines", type=int, default=None, help="Số lượng vạch dừng tối đa cần phát hiện (ví dụ: 1 hoặc 2)")
     parser.add_argument("--output-img", type=str, default="preview_stopline.jpg", help="Đường dẫn xuất ảnh xem trước")
     parser.add_argument("--headless", action="store_true", help="Chạy không mở cửa sổ giao diện")
     parser.add_argument("--debug", action="store_true", help="Xuất ảnh debug chi tiết: dòng xe, Road ROI, cụm xe dừng, ứng viên kèm bảng điểm")
@@ -162,6 +165,7 @@ if __name__ == "__main__":
         mode=args.mode,
         ai_model=args.ai_model,
         redetect=args.redetect,
+        max_lines=args.max_lines,
         output_image=args.output_img,
         headless=args.headless,
         debug=args.debug

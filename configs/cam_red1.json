@@ -1,25 +1,25 @@
 {
   "camera_id": "cam_red1",
-  "source_video": "dataset_videos\\red4.mp4",
-  "detector_mode": "ai",
+  "source_video": "dataset_videos\\red1.mp4",
+  "detector_mode": "ai_maskrcnn",
   "total_lines": 1,
   "lines": [
     {
       "id": "stop_line_1",
-      "name": "Vach 1 (AI YOLO-seg - Y=561)",
+      "name": "Vach 1 (Mask R-CNN - Y=685)",
       "line": [
         [
           0,
-          561
+          681
         ],
         [
           1079,
-          561
+          689
         ]
       ],
-      "direction": "TOP_TO_BOTTOM",
-      "confidence": 0.418,
-      "method": "ai_yolo_segmentation"
+      "direction": "BOTTOM_TO_TOP",
+      "confidence": 0.951,
+      "method": "ai_maskrcnn_segmentation"
     }
   ]
 }
