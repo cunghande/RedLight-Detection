@@ -8,6 +8,7 @@ import numpy as np
 import yaml
 
 from src.trajectory_analyzer import TrajectoryAnalyzer
+from ultralytics import YOLO
 
 logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(message)s")
 logger = logging.getLogger("StopLineDetector")
@@ -117,6 +118,9 @@ class StopLineDetector:
             if cached is not None and len(cached) > 0:
                 return cached
 
+        if mode == "ai":
+            return self._detect_ai(video_source, camera_id=camera_id, debug=debug)
+
         logger.info(f"Thực hiện phát hiện vạch dừng: SINH ỨNG VIÊN -> CHẤM ĐIỂM -> CHỌN cho '{camera_id}'...")
 
         # 1. Trích xuất đặc trưng chuyển động từ quỹ đạo xe (Motion & Trajectory)
@@ -146,6 +150,81 @@ class StopLineDetector:
             self.save_to_cache(camera_id, selected_lines, mode=mode, video_path=source_name)
 
         return selected_lines
+
+    def _detect_ai(
+        self,
+        video_source: Union[str, Path, cv2.VideoCapture],
+        camera_id: str,
+        debug: bool = False
+    ) -> List[Dict]:
+        """Phát hiện vạch dừng bằng mô hình học sâu phân đoạn ảnh (YOLOv8-seg)"""
+        logger.info(f"Thực hiện phát hiện vạch dừng bằng AI SEGMENTATION (Deep Learning) cho '{camera_id}'...")
+        weights_path = Path("best_stopline_seg.pt")
+        if not weights_path.exists():
+            weights_path = Path(self.cfg.get("models", {}).get("stopline_seg", {}).get("weights", "best.pt"))
+
+        ai_model = YOLO(str(weights_path))
+
+        frames, h, w = self._sample_video_frames(video_source, 20)
+        if not frames:
+            return []
+        bg_frame = np.median(frames, axis=0).astype(np.uint8)
+
+        results = ai_model.predict(bg_frame, conf=0.20, verbose=False)[0]
+
+        selected = []
+        if results.masks is not None and len(results.masks) > 0:
+            for i, (box, mask_xy) in enumerate(zip(results.boxes, results.masks.xy)):
+                cls_id = int(box.cls[0])
+                cls_name = ai_model.names.get(cls_id, "stop_line")
+                conf = float(box.conf[0])
+
+                if len(mask_xy) < 3:
+                    continue
+
+                poly = np.array(mask_xy, dtype=np.int32)
+                min_y = int(np.min(poly[:, 1]))
+                max_y = int(np.max(poly[:, 1]))
+                avg_y = int((min_y + max_y) / 2)
+
+                # Kiểm tra quá gần với vạch đã chọn trước
+                if any(abs(avg_y - int((prev['line'][0][1] + prev['line'][1][1]) / 2)) < self.secondary_dist_thresh for prev in selected):
+                    continue
+
+                direction = "TOP_TO_BOTTOM" if avg_y < h * 0.55 else "BOTTOM_TO_TOP"
+                line_idx = len(selected) + 1
+                selected.append({
+                    "id": f"stop_line_{line_idx}",
+                    "name": f"Vach {line_idx} (AI YOLO-seg - Y={avg_y})",
+                    "line": [(0, avg_y), (w - 1, avg_y)],
+                    "direction": direction,
+                    "confidence": round(conf, 3),
+                    "method": "ai_yolo_segmentation"
+                })
+
+                if len(selected) >= self.max_lines:
+                    break
+
+        if debug:
+            plot_img = results.plot()
+            for s in selected:
+                p1, p2 = s["line"]
+                cv2.line(plot_img, p1, p2, (0, 255, 0), 4)
+                cv2.putText(plot_img, s["name"], (20, p1[1] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+            cv2.imwrite(f"debug_ai_prediction_{camera_id}.jpg", plot_img)
+            logger.info(f"[DEBUG] Đã xuất ảnh dự đoán AI ra: debug_ai_prediction_{camera_id}.jpg")
+
+        if selected:
+            logger.info(f"[KẾT QUẢ AI] Đã phát hiện {len(selected)} vạch dừng qua AI Segmentation:")
+            for s in selected:
+                logger.info(f"   -> {s['name']}: {s['line']} (Confidence: {s['confidence']})")
+            logger.info("")
+            self.save_to_cache(camera_id, selected, mode="ai", video_path=str(video_source))
+        else:
+            logger.warning("[AI] Không tìm thấy vạch qua AI Segmentation. Tự động chuyển chế độ fallback classical.")
+            return self.detect(video_source, camera_id=camera_id, mode="classical", redetect=True, debug=debug)
+
+        return selected
 
     # =========================================================================
     # 1. SINH ỨNG VIÊN (CANDIDATE GENERATION VỚI CLAHE + ADAPTIVE THRESHOLD)

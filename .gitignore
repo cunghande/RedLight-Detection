@@ -19,3 +19,10 @@ Thumbs.db
 *.jpg
 test_*.py
 output_*.mp4
+
+# Generated dataset images & labels (can be regenerated via prepare_dataset.py)
+dataset_stopline/images/
+dataset_stopline/labels/
+runs/
+yolov8n-seg.pt
+research_artifacts/weights/

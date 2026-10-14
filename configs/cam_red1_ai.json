@@ -1,0 +1,25 @@
+{
+  "camera_id": "cam_red1_ai",
+  "source_video": "dataset_videos\\red1.mp4",
+  "detector_mode": "ai",
+  "total_lines": 1,
+  "lines": [
+    {
+      "id": "stop_line_1",
+      "name": "Vach 1 (AI YOLO-seg - Y=654)",
+      "line": [
+        [
+          0,
+          654
+        ],
+        [
+          1079,
+          654
+        ]
+      ],
+      "direction": "BOTTOM_TO_TOP",
+      "confidence": 0.334,
+      "method": "ai_yolo_segmentation"
+    }
+  ]
+}

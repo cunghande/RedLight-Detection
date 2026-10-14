@@ -1,0 +1,19 @@
+{
+  "model_architecture": "yolov8n-seg.pt",
+  "epochs": 10,
+  "training_time_seconds": 2294.18,
+  "best_weights_path": "D:\\Code\\football-analytics\\runs\\segment\\runs\\stopline_research\\yolov8_stopline_seg\\weights\\best.pt",
+  "test_metrics_segmentation": {
+    "mAP50_mask": 0.5384,
+    "mAP50_95_mask": 0.2659,
+    "precision_mask": 0.49,
+    "recall_mask": 0.5851,
+    "f1_score_mask": 0.5333
+  },
+  "test_metrics_bounding_box": {
+    "mAP50_box": 0.4233,
+    "mAP50_95_box": 0.1144,
+    "precision_box": 0.4424,
+    "recall_box": 0.7929
+  }
+}
