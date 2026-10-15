@@ -15,8 +15,6 @@ logger = logging.getLogger("PreviewStopLine")
 def preview_and_confirm(
     video_path: str,
     camera_id: str,
-    mode: str = "classical",
-    ai_model: str = "yolo",
     redetect: bool = False,
     max_lines: int = None,
     output_image: str = "preview_stopline.jpg",
@@ -40,8 +38,6 @@ def preview_and_confirm(
     proposed_lines = detector.detect(
         video_p,
         camera_id=camera_id,
-        mode=mode,
-        ai_model=ai_model,
         redetect=redetect,
         max_lines=max_lines,
         debug=debug
@@ -68,7 +64,7 @@ def preview_and_confirm(
 
         # Header panel
         cv2.rectangle(clone, (0, 0), (w, 55), (20, 20, 20), -1)
-        header_text = f"XAC NHAN VACH DUNG - CAMERA: {camera_id} | Che do: {mode.upper()}"
+        header_text = f"XAC NHAN VACH DUNG - CAMERA: {camera_id} | Che do: CV"
         cv2.putText(clone, header_text, (20, 35), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
 
         # Vẽ các vạch hiện có
@@ -150,8 +146,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Xem trước và xác nhận vạch dừng bán tự động")
     parser.add_argument("--video", type=str, default="dataset_videos/red1.mp4", help="Đường dẫn file video")
     parser.add_argument("--camera-id", type=str, default="cam_01", help="ID định danh camera (cam_01, cam_red1...)")
-    parser.add_argument("--mode", type=str, default="classical", choices=["classical", "ai"], help="Chế độ quét vạch")
-    parser.add_argument("--ai-model", type=str, default="yolo", choices=["yolo", "deeplabv3", "maskrcnn"], help="Kiến trúc AI phân đoạn (yolo, deeplabv3, maskrcnn)")
     parser.add_argument("--redetect", action="store_true", help="Bỏ qua cache và ép phát hiện lại")
     parser.add_argument("--max-lines", type=int, default=None, help="Số lượng vạch dừng tối đa cần phát hiện (ví dụ: 1 hoặc 2)")
     parser.add_argument("--output-img", type=str, default="preview_stopline.jpg", help="Đường dẫn xuất ảnh xem trước")
@@ -162,8 +156,6 @@ if __name__ == "__main__":
     preview_and_confirm(
         video_path=args.video,
         camera_id=args.camera_id,
-        mode=args.mode,
-        ai_model=args.ai_model,
         redetect=args.redetect,
         max_lines=args.max_lines,
         output_image=args.output_img,

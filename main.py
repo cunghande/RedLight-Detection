@@ -1,4 +1,5 @@
 import argparse
+from datetime import datetime
 import logging
 from pathlib import Path
 import time
@@ -66,8 +67,6 @@ def draw_hud(
 def run_pipeline(
     video_source: str,
     camera_id: str = "cam_01",
-    mode: str = "classical",
-    ai_model: str = "yolo",
     redetect: bool = False,
     max_lines: Optional[int] = None,
     output_video: Optional[str] = "output_violation.mp4",
@@ -88,8 +87,6 @@ def run_pipeline(
     stop_lines = line_detector.detect(
         video_source,
         camera_id=camera_id,
-        mode=mode,
-        ai_model=ai_model,
         redetect=redetect,
         max_lines=max_lines,
         debug=debug
@@ -113,21 +110,32 @@ def run_pipeline(
 
     # 3. KHỞI TẠO MODEL YOLO VÀ TRACKER (BYTETRACK)
     from ultralytics import YOLO
-    model_weights = cfg.get("models", {}).get("vehicle_detector", {}).get("weights", "yolov8s.pt")
+    model_weights = cfg.get("models", {}).get("vehicle_detector", {}).get("weights", "weights/yolo11x.pt")
+    if not Path(model_weights).is_file():
+        raise FileNotFoundError(f"Không tìm thấy trọng số xe: {model_weights}")
     logger.info(f"Đang tải model YOLO ({model_weights}) kèm ByteTrack...")
     yolo_model = YOLO(model_weights)
 
     # 4. KHỞI TẠO BỘ NHẬN DIỆN ĐÈN TÍN HIỆU
-    tl_detector = TrafficLightDetector(yolo_model=yolo_model)
+    light_cfg = cfg.get("models", {}).get("traffic_light", {})
+    light_weights = light_cfg.get("weights", "weights/yolov8s.pt")
+    if not Path(light_weights).is_file():
+        raise FileNotFoundError(f"Không tìm thấy trọng số đèn: {light_weights}")
+    light_model = YOLO(light_weights)
+    if light_model.names.get(9) != "traffic light":
+        raise ValueError("Model đèn cần là checkpoint COCO có class 9 = traffic light")
+    tl_detector = TrafficLightDetector(yolo_model=light_model,
+                                       conf_thresh=light_cfg.get("conf", 0.25),
+                                       max_missing_frames=light_cfg.get("max_missing_frames", 10))
 
     # 5. KHỞI TẠO LOGIC VI PHẠM (VIOLATION ENGINE)
-    output_dir = Path(cfg.get("general", {}).get("output_dir", "violations"))
+    output_dir = Path(cfg.get("general", {}).get("output_dir", "violations")) / datetime.now().strftime("run_%Y%m%d_%H%M%S_%f")
     violation_engine = ViolationEngine(
         stop_lines=stop_lines,
         output_dir=output_dir,
-        penalties=cfg.get("penalties", {}),
         min_violation_frames=cfg.get("violation_logic", {}).get("min_violation_frames", 3),
-        allow_right_turn=cfg.get("violation_logic", {}).get("allow_right_turn", False)
+        allow_right_turn=cfg.get("violation_logic", {}).get("allow_right_turn", False),
+        right_turn_x_ratio=cfg.get("violation_logic", {}).get("right_turn_x_ratio", 0.75)
     )
 
     # Thiết lập VideoWriter nếu cần lưu video
@@ -150,7 +158,13 @@ def run_pipeline(
     prev_time = time.time()
     fps = 0.0
 
-    class_names_map = {0: "Nguoi di bo", 1: "Xe dap", 2: "O to", 3: "Xe may", 5: "Xe buyt", 7: "Xe tai"}
+    class_aliases = {"person": "Nguoi di bo", "bicycle": "Xe dap", "car": "O to",
+                     "motorcycle": "Xe may", "bus": "Xe buyt", "truck": "Xe tai"}
+    vehicle_cfg = cfg.get("models", {}).get("vehicle_detector", {})
+    selected_names = vehicle_cfg.get("track_names", list(class_aliases))
+    track_classes = [i for i, name in yolo_model.names.items() if name in selected_names]
+    if not track_classes:
+        raise ValueError(f"No selected classes in checkpoint: {yolo_model.names}")
 
     while True:
         if not paused:
@@ -169,7 +183,7 @@ def run_pipeline(
                 frame,
                 persist=True,
                 tracker=cfg.get("models", {}).get("vehicle_detector", {}).get("tracker", "bytetrack.yaml"),
-                classes=cfg.get("models", {}).get("vehicle_detector", {}).get("track_classes", [0, 1, 2, 3, 5, 7]),
+                classes=track_classes,
                 conf=cfg.get("models", {}).get("vehicle_detector", {}).get("conf", 0.35),
                 verbose=False
             )
@@ -182,12 +196,14 @@ def run_pipeline(
                     box = boxes_data.xyxy[i].cpu().numpy().astype(int)
                     cls_id = int(boxes_data.cls[i].cpu().numpy())
                     conf = float(boxes_data.conf[i].cpu().numpy())
-                    track_id = int(boxes_data.id[i].cpu().numpy()) if boxes_data.id is not None and boxes_data.id[i] is not None else (i + 1)
+                    track_id = int(boxes_data.id[i].cpu().numpy()) if boxes_data.id is not None and boxes_data.id[i] is not None else None
 
+                    if track_id is None:
+                        continue
                     tracks.append({
                         "id": track_id,
                         "box": box,
-                        "class_name": class_names_map.get(cls_id, "O to"),
+                        "class_name": class_aliases.get(yolo_model.names[cls_id], yolo_model.names[cls_id]),
                         "conf": conf
                     })
 
@@ -208,7 +224,7 @@ def run_pipeline(
             prev_time = now
 
             # Vẽ HUD Dashboard
-            line_desc = f"{len(current_stop_lines)} vach ({mode.upper()})"
+            line_desc = f"{len(current_stop_lines)} vach (CV)"
             draw_hud(
                 frame=annotated_frame,
                 traffic_state=traffic_state,
@@ -239,22 +255,20 @@ def run_pipeline(
     if not headless:
         cv2.destroyAllWindows()
 
-    # 6. XUẤT BÁO CÁO PHẠT NGUỘI JSON, CSV, MARKDOWN
+    # Xuất các sự kiện cần người dùng kiểm tra.
     report_gen = ReportGenerator(output_dir=output_dir)
     report_gen.export_reports(violation_engine.violations_log)
 
-    logger.info(f"\n[HOÀN TẤT] Tổng số phương tiện vi phạm xử phạt: {len(violation_engine.violated_ids)}")
-    logger.info(f"Báo cáo JSON: {output_dir / 'traffic_citations.json'}")
-    logger.info(f"Báo cáo CSV:  {output_dir / 'traffic_citations.csv'}")
-    logger.info(f"Báo cáo Markdown: {output_dir / 'traffic_citations_report.md'}")
+    logger.info(f"\n[HOÀN TẤT] Số sự kiện nghi vượt đèn đỏ: {len(violation_engine.violated_ids)}")
+    logger.info(f"Báo cáo JSON: {output_dir / 'events.json'}")
+    logger.info(f"Báo cáo CSV:  {output_dir / 'events.csv'}")
+    logger.info(f"Báo cáo Markdown: {output_dir / 'events.md'}")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Hệ thống phát hiện phương tiện vượt đèn đỏ tự động định vị vạch dừng")
     parser.add_argument("--video", "--source", dest="video", type=str, default="dataset_videos/red1.mp4", help="Đường dẫn file video hoặc ID camera")
     parser.add_argument("--camera-id", type=str, default="cam_01", help="ID định danh camera (cam_01, cam_red1...)")
-    parser.add_argument("--mode", type=str, default="classical", choices=["classical", "ai"], help="Chế độ quét vạch dừng (classical / ai)")
-    parser.add_argument("--ai-model", type=str, default="yolo", choices=["yolo", "deeplabv3", "maskrcnn"], help="Kiến trúc AI phân đoạn (yolo, deeplabv3, maskrcnn)")
     parser.add_argument("--redetect", action="store_true", help="Bỏ qua cache và ép buộc quét lại vạch mới")
     parser.add_argument("--max-lines", type=int, default=None, help="Số lượng vạch dừng tối đa cần phát hiện (1 hoặc 2)")
     parser.add_argument("--output", type=str, default="output_violation.mp4", help="Đường dẫn lưu video kết quả")
@@ -266,8 +280,6 @@ if __name__ == "__main__":
     run_pipeline(
         video_source=args.video,
         camera_id=args.camera_id,
-        mode=args.mode,
-        ai_model=args.ai_model,
         redetect=args.redetect,
         max_lines=args.max_lines,
         output_video=args.output,

@@ -1,6 +1,6 @@
 {
   "camera_id": "cam_red1",
-  "source_video": "dataset_videos\\red1.mp4",
+  "source_video": "dataset_videos/red1.mp4",
   "detector_mode": "ai_maskrcnn",
   "total_lines": 1,
   "lines": [

@@ -1,86 +1,16 @@
 [
   {
-    "ma_bien_ban": "PN-20261013-0035",
-    "tieu_de": "THÔNG BÁO VI PHẠM TRẬT TỰ AN TOÀN GIAO THÔNG ĐƯỜNG BỘ (PHẠT NGUỘI)",
-    "loai_vi_pham": "Không chấp hành hiệu lệnh của đèn tín hiệu giao thông (Vượt đèn đỏ)",
-    "can_cu_phap_ly": "Điểm a Khoản 5 Điều 5 NĐ 100/2019/NĐ-CP (sửa đổi NĐ 123/2021)",
-    "vach_vi_pham": "Vach dung (Y=561)",
-    "thong_tin_phuong_tien": {
-      "ma_dinh_danh_track_id": 35,
-      "loai_phuong_tien": "O to",
-      "do_tin_cay_ai": "83.5%",
-      "mo_hinh_nhan_dien": "YOLO (yolov8s.pt)"
-    },
-    "thoi_gian_dia_diem": {
-      "thoi_diem_ghi_nhan": "2026-10-13 22:20:58",
-      "nguon_video": "red1.mp4",
-      "khung_hinh_frame": 176,
-      "tin_hieu_den": "RED (ĐÈN ĐỎ)",
-      "toa_do_vach_vi_pham": [
-        [
-          191,
-          561
-        ],
-        [
-          1029,
-          561
-        ]
-      ]
-    },
-    "muc_xu_phat_du_kien": {
-      "tien_phat": "4.000.000 - 6.000.000 VNĐ",
-      "hinh_thuc_bo_sung": "Tước quyền sử dụng GPLX từ 01 đến 03 tháng",
-      "bien_phap_khac": "Trừ điểm Giấy phép lái xe theo Luật TTATGTĐB mới"
-    },
-    "hinh_anh_bang_chung": {
-      "anh_hien_truong": "PN-20261013-0035_scene.jpg",
-      "anh_phuong_tien": "PN-20261013-0035_vehicle.jpg"
-    },
-    "trang_thai_xu_ly": "ĐÃ LẬP HỒ SƠ - CHỜ GỬI THÔNG BÁO PHẠT NGUỘI",
-    "track_id": 35,
-    "vehicle_type": "O to",
-    "time": "2026-10-13 22:20:58"
-  },
-  {
-    "ma_bien_ban": "PN-20261013-0005",
-    "tieu_de": "THÔNG BÁO VI PHẠM TRẬT TỰ AN TOÀN GIAO THÔNG ĐƯỜNG BỘ (PHẠT NGUỘI)",
-    "loai_vi_pham": "Không chấp hành hiệu lệnh của đèn tín hiệu giao thông (Vượt đèn đỏ)",
-    "can_cu_phap_ly": "Điểm a Khoản 5 Điều 5 NĐ 100/2019/NĐ-CP (sửa đổi NĐ 123/2021)",
-    "vach_vi_pham": "Vach dung (Y=561)",
-    "thong_tin_phuong_tien": {
-      "ma_dinh_danh_track_id": 5,
-      "loai_phuong_tien": "O to",
-      "do_tin_cay_ai": "78.6%",
-      "mo_hinh_nhan_dien": "YOLO (yolov8s.pt)"
-    },
-    "thoi_gian_dia_diem": {
-      "thoi_diem_ghi_nhan": "2026-10-13 22:20:59",
-      "nguon_video": "red1.mp4",
-      "khung_hinh_frame": 188,
-      "tin_hieu_den": "RED (ĐÈN ĐỎ)",
-      "toa_do_vach_vi_pham": [
-        [
-          191,
-          561
-        ],
-        [
-          1029,
-          561
-        ]
-      ]
-    },
-    "muc_xu_phat_du_kien": {
-      "tien_phat": "4.000.000 - 6.000.000 VNĐ",
-      "hinh_thuc_bo_sung": "Tước quyền sử dụng GPLX từ 01 đến 03 tháng",
-      "bien_phap_khac": "Trừ điểm Giấy phép lái xe theo Luật TTATGTĐB mới"
-    },
-    "hinh_anh_bang_chung": {
-      "anh_hien_truong": "PN-20261013-0005_scene.jpg",
-      "anh_phuong_tien": "PN-20261013-0005_vehicle.jpg"
-    },
-    "trang_thai_xu_ly": "ĐÃ LẬP HỒ SƠ - CHỜ GỬI THÔNG BÁO PHẠT NGUỘI",
+    "citation_code": "PN-20261014-0005",
     "track_id": 5,
     "vehicle_type": "O to",
-    "time": "2026-10-13 22:20:59"
+    "confidence": 0.77,
+    "frame_index": 195,
+    "timestamp": "2026-10-14 16:28:10",
+    "stop_line_violated": "Vach 1 (AI YOLO-seg - Y=561)",
+    "fine_range": "4.000.000 - 6.000.000 VNĐ",
+    "license_suspension": "Tước GPLX 1 - 3 tháng",
+    "legal_basis": "Nghị định 100/2019/NĐ-CP (sửa đổi NĐ 123/2021/NĐ-CP)",
+    "scene_image": "PN-20261014-0005_scene.jpg",
+    "vehicle_crop_image": "PN-20261014-0005_vehicle.jpg"
   }
 ]

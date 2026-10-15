@@ -18,14 +18,13 @@ class ViolationEngine:
         1. Bỏ qua xe đã vượt qua vạch trước khi đèn đỏ bật.
         2. Yêu cầu vi phạm duy trì ít nhất K frame liên tiếp (mặc định K=3).
         3. Hỗ trợ cấu hình ngoại lệ rẽ phải (Right-turn exception).
-        4. Mỗi ID phương tiện (Track ID) chỉ bị xử phạt duy nhất 1 lần.
+        4. Mỗi ID phương tiện (Track ID) chỉ ghi nhận một sự kiện trong một lượt chạy.
     """
 
     def __init__(
         self,
         stop_lines: List[Dict],
         output_dir: Path,
-        penalties: Optional[Dict] = None,
         min_violation_frames: int = 3,
         allow_right_turn: bool = False,
         right_turn_x_ratio: float = 0.75
@@ -33,7 +32,6 @@ class ViolationEngine:
         self.stop_lines = stop_lines
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
-        self.penalties = penalties or {}
         self.min_violation_frames = min_violation_frames
         self.allow_right_turn = allow_right_turn
         self.right_turn_x_ratio = right_turn_x_ratio
@@ -42,7 +40,8 @@ class ViolationEngine:
         self.previous_positions: Dict[int, Tuple[int, int]] = {}
         self.previous_signs: Dict[int, Dict[str, float]] = {} # {track_id: {line_id: sign}}
         self.violated_ids: Set[int] = set()
-        self.violation_consecutive_counts: Dict[int, int] = {}
+        self.violation_consecutive_counts: Dict[Tuple[int, str], int] = {}
+        self.violation_last_frame: Dict[Tuple[int, str], int] = {}
         self.passed_before_red: Set[int] = set() # Các xe đã qua vạch trước khi đèn đỏ
         self.violations_log: List[Dict] = []
 
@@ -103,58 +102,37 @@ class ViolationEngine:
             for line_cfg in self.stop_lines:
                 line_id = line_cfg["id"]
                 current_d = self._compute_signed_distance(ref_pt, line_cfg["line"])
-
-                # Nếu xe xuất hiện khi đèn chưa đỏ và đã nằm sau vạch -> đánh dấu xe đã qua hợp lệ
-                if traffic_state != "RED":
-                    # Tùy theo hướng đi
-                    direction = line_cfg.get("direction", "TOP_TO_BOTTOM")
-                    y_line = (line_cfg["line"][0][1] + line_cfg["line"][1][1]) / 2
-                    if direction == "TOP_TO_BOTTOM" and ref_pt[1] > y_line + 20:
-                        self.passed_before_red.add(track_id)
-                    elif direction == "BOTTOM_TO_TOP" and ref_pt[1] < y_line - 20:
-                        self.passed_before_red.add(track_id)
-
+                start, end = line_cfg["line"]
+                line_sign = 1 if end[0] >= start[0] else -1
+                direction = line_cfg.get("direction", "TOP_TO_BOTTOM")
+                current_after = current_d * line_sign * (1 if direction == "BOTTOM_TO_TOP" else -1) > 0
                 prev_d = self.previous_signs[track_id].get(line_id)
+                prev_after = (prev_d * line_sign * (1 if direction == "BOTTOM_TO_TOP" else -1) > 0
+                              if prev_d is not None else None)
+                key = (track_id, line_id)
 
-                # KIỂM TRA ĐỔI DẤU TRONG LÚC ĐÈN ĐỎ
-                if prev_d is not None and traffic_state == "RED" and track_id not in self.violated_ids and track_id not in self.passed_before_red:
-                    # Kiểm tra dấu đổi từ trước sang sau
-                    direction = line_cfg.get("direction", "TOP_TO_BOTTOM")
-                    is_crossing = False
-
-                    # Nếu tích prev_d * current_d <= 0 tức là đã cắt qua vạch
-                    if (prev_d * current_d) < 0:
-                        is_crossing = True
-                    else:
-                        # Dự phòng kiểm tra bước nhảy tọa độ Y qua vạch
-                        y_line = (line_cfg["line"][0][1] + line_cfg["line"][1][1]) / 2
-                        prev_y = self.previous_positions.get(track_id, ref_pt)[1]
-                        if direction == "TOP_TO_BOTTOM" and prev_y <= y_line and ref_pt[1] > y_line:
-                            is_crossing = True
-                        elif direction == "BOTTOM_TO_TOP" and prev_y >= y_line and ref_pt[1] < y_line:
-                            is_crossing = True
-
-                    # Ngoại lệ cho phép rẽ phải
-                    if is_crossing and self.allow_right_turn:
-                        if ref_pt[0] >= w * self.right_turn_x_ratio:
-                            is_crossing = False
-
-                    if is_crossing:
-                        count = self.violation_consecutive_counts.get(track_id, 0) + 1
-                        self.violation_consecutive_counts[track_id] = count
-
+                if traffic_state != "RED":
+                    self.violation_consecutive_counts.pop(key, None)
+                    if current_after:
+                        self.passed_before_red.add(track_id)
+                elif track_id not in self.violated_ids and track_id not in self.passed_before_red:
+                    in_segment = min(start[0], end[0]) <= ref_pt[0] <= max(start[0], end[0])
+                    crossing = prev_after is False and current_after and in_segment
+                    if crossing and self.allow_right_turn and ref_pt[0] >= w * self.right_turn_x_ratio:
+                        crossing = False
+                    continuing = (key in self.violation_consecutive_counts and current_after
+                                  and self.violation_last_frame.get(key) == frame_idx - 1)
+                    if crossing or continuing:
+                        count = self.violation_consecutive_counts.get(key, 0) + 1
+                        self.violation_consecutive_counts[key] = count
+                        self.violation_last_frame[key] = frame_idx
                         if count >= self.min_violation_frames:
                             self.violated_ids.add(track_id)
-                            violation_entry = self._record_violation(
-                                frame=frame,
-                                box=[x1, y1, x2, y2],
-                                track_id=track_id,
-                                cls_name=cls_name,
-                                conf=conf,
-                                frame_idx=frame_idx,
-                                line_cfg=line_cfg
-                            )
-                            current_frame_violations.append(violation_entry)
+                            current_frame_violations.append(self._record_violation(
+                                frame=frame, box=[x1, y1, x2, y2], track_id=track_id,
+                                cls_name=cls_name, conf=conf, frame_idx=frame_idx, line_cfg=line_cfg))
+                    elif not current_after or key in self.violation_consecutive_counts:
+                        self.violation_consecutive_counts.pop(key, None)
 
                 self.previous_signs[track_id][line_id] = current_d
 
@@ -195,20 +173,20 @@ class ViolationEngine:
         frame_idx: int,
         line_cfg: Dict
     ) -> Dict:
-        """Lưu bằng chứng và biên bản phạt nguội"""
+        """Lưu ảnh của sự kiện nghi vượt đèn đỏ để người dùng kiểm tra."""
         now = datetime.now()
         timestamp_str = now.strftime("%Y-%m-%d %H:%M:%S")
-        citation_code = f"PN-{now.strftime('%Y%m%d')}-{track_id:04d}"
+        event_id = f"EV-{now.strftime('%Y%m%d-%H%M%S-%f')}-{track_id:04d}"
         line_name = line_cfg.get("name", "Vach dung")
 
         # 1. Lưu ảnh hiện trường
-        scene_filename = self.output_dir / f"{citation_code}_scene.jpg"
+        scene_filename = self.output_dir / f"{event_id}_scene.jpg"
         scene_img = frame.copy()
         x1, y1, x2, y2 = map(int, box)
         cv2.rectangle(scene_img, (x1, y1), (x2, y2), (0, 0, 255), 3)
         cv2.putText(
             scene_img,
-            f"BIEN BAN PHAT NGUOI: {citation_code} - {cls_name} ID:{track_id}",
+            f"CAN KIEM TRA: {event_id} - {cls_name} ID:{track_id}",
             (x1, max(30, y1 - 10)),
             cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2
         )
@@ -217,32 +195,22 @@ class ViolationEngine:
         # 2. Lưu ảnh crop xe
         h, w = frame.shape[:2]
         crop_img = frame[max(0, y1 - 10):min(h, y2 + 10), max(0, x1 - 10):min(w, x2 + 10)]
-        crop_filename = self.output_dir / f"{citation_code}_vehicle.jpg"
+        crop_filename = self.output_dir / f"{event_id}_vehicle.jpg"
         if crop_img.size > 0:
             cv2.imwrite(str(crop_filename), crop_img)
 
-        # 3. Mức phạt quy chuẩn theo Nghị định 100/123
-        reg = self.penalties.get(cls_name, {
-            "fine_range": "800.000 - 1.000.000 VNĐ",
-            "suspension": "Tước GPLX 1 - 3 tháng",
-            "legal_code": "Nghị định 100/2019/NĐ-CP"
-        })
-
         entry = {
-            "citation_code": citation_code,
+            "event_id": event_id,
             "track_id": track_id,
             "vehicle_type": cls_name,
             "confidence": round(float(conf), 2),
             "frame_index": frame_idx,
             "timestamp": timestamp_str,
             "stop_line_violated": line_name,
-            "fine_range": reg.get("fine_range", "4.000.000 - 6.000.000 VNĐ"),
-            "license_suspension": reg.get("suspension", "Tước GPLX 1 - 3 tháng"),
-            "legal_basis": reg.get("legal_code", "Nghị định 100/2019/NĐ-CP"),
             "scene_image": str(scene_filename.name),
             "vehicle_crop_image": str(crop_filename.name)
         }
 
         self.violations_log.append(entry)
-        logger.warning(f"[PHẠT NGUỘI] {citation_code} | {cls_name} (ID:{track_id}) | {line_name} | Mức phạt: {entry['fine_range']}")
+        logger.warning("[CẦN KIỂM TRA] %s | %s (ID:%s) | %s", event_id, cls_name, track_id, line_name)
         return entry

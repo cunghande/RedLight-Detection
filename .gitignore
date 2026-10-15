@@ -18,11 +18,19 @@ Thumbs.db
 # Temporary debug images & test videos
 *.jpg
 test_*.py
+!tests/test_*.py
 output_*.mp4
 
-# Generated dataset images & labels (can be regenerated via prepare_dataset.py)
+# Local datasets and training artifacts
 dataset_stopline/images/
 dataset_stopline/labels/
 runs/
 yolov8n-seg.pt
 research_artifacts/weights/
+weights/*
+!weights/yolov8s.pt
+.test-deps/
+.test-tmp/
+.pytest_cache/
+*.ipynb_checkpoints/
+traffic_results/

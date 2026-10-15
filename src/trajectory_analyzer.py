@@ -20,15 +20,19 @@ class TrajectoryAnalyzer:
     def __init__(
         self,
         yolo_model: Optional[YOLO] = None,
+        model_weights: str = "weights/yolo11x.pt",
         tracker_cfg: str = "bytetrack.yaml",
         track_classes: Optional[List[int]] = None,
+        track_names: Optional[List[str]] = None,
         conf_thresh: float = 0.35,
         min_displacement: float = 25.0, # pixel tối thiểu để coi là xe đang di chuyển
         max_stop_speed: float = 3.5     # pixel/frame tối đa để coi là xe đứng yên
     ):
         self.model = yolo_model
+        self.model_weights = model_weights
         self.tracker_cfg = tracker_cfg
-        self.track_classes = track_classes or [0, 1, 2, 3, 5, 7]
+        self.track_classes = track_classes
+        self.track_names = track_names or ["bicycle", "car", "motorcycle", "bus", "truck"]
         self.conf_thresh = conf_thresh
         self.min_displacement = min_displacement
         self.max_stop_speed = max_stop_speed
@@ -63,7 +67,12 @@ class TrajectoryAnalyzer:
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 
         if self.model is None:
-            self.model = YOLO("yolov8s.pt")
+            self.model = YOLO(self.model_weights)
+        if self.track_classes is None:
+            self.track_classes = [int(index) for index, name in self.model.names.items()
+                                  if name in self.track_names]
+        if not self.track_classes:
+            raise ValueError(f"Checkpoint has none of the selected vehicle classes: {self.model.names}")
 
         trajectories: Dict[int, List[Tuple[int, int]]] = {} # track_id -> list of (x, y)
         frame_speeds: Dict[int, List[float]] = {}          # track_id -> list of speeds

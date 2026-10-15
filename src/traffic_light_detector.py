@@ -15,10 +15,13 @@ class TrafficLightDetector:
     - Hỗ trợ cơ chế giữ trạng thái (State Persistence) khi đèn tạm thời bị che khuất và phím tắt chuyển thủ công [t].
     """
 
-    def __init__(self, yolo_model=None, conf_thresh: float = 0.25, hsv_ranges: Optional[Dict] = None):
+    def __init__(self, yolo_model=None, conf_thresh: float = 0.25, hsv_ranges: Optional[Dict] = None,
+                 max_missing_frames: int = 10):
         self.model = yolo_model
         self.conf_thresh = conf_thresh
-        self.current_state = "GREEN"
+        self.current_state = "UNKNOWN"
+        self.max_missing_frames = max_missing_frames
+        self.missing_frames = 0
         self.consecutive_count = 0
         self.detected_boxes: List[Tuple[int, int, int, int]] = []
 
@@ -61,7 +64,9 @@ class TrafficLightDetector:
         self.detected_boxes = boxes
 
         if not boxes:
-            # Giữ trạng thái cũ nếu không tìm thấy cụm đèn ở frame này
+            self.missing_frames += 1
+            if self.missing_frames >= self.max_missing_frames:
+                self.current_state = "UNKNOWN"
             return self.current_state, []
 
         state_votes = {"RED": 0, "YELLOW": 0, "GREEN": 0}
@@ -97,6 +102,12 @@ class TrafficLightDetector:
                     state_votes["GREEN"] += 1
 
         # Quyết định trạng thái theo số phiếu
+        if not any(state_votes.values()):
+            self.missing_frames += 1
+            if self.missing_frames >= self.max_missing_frames:
+                self.current_state = "UNKNOWN"
+            return self.current_state, boxes
+        self.missing_frames = 0
         if state_votes["RED"] > 0:
             self.current_state = "RED"
         elif state_votes["YELLOW"] > 0 and state_votes["YELLOW"] >= state_votes["GREEN"]:

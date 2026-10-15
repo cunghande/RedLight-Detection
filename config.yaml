@@ -1,121 +1,45 @@
-# ==============================================================================
-# HỆ THỐNG PHÁT HIỆN PHƯƠNG TIỆN VƯỢT ĐÈN ĐỎ & TỰ ĐỘNG NHẬN DIỆN VẠCH DỪNG
-# File cấu hình tập trung (config.yaml)
-# ==============================================================================
-
+# Cấu hình luồng video; notebook huấn luyện dùng cấu hình riêng.
 general:
-  output_dir: "violations"
-  save_video: true
-  output_video_path: "output_violation.mp4"
-  device: "auto" # "cpu", "cuda", "0", "auto"
+  output_dir: violations
 
 camera:
-  default_id: "cam_01"
-  cache_dir: "configs"
-  redetect: false # ép buộc quét lại vạch thay vì đọc từ cache
-  stabilization_enabled: false # bật/tắt chống rung homography
+  cache_dir: configs
+  stabilization_enabled: false
 
 models:
   vehicle_detector:
-    weights: "yolov8s.pt"
+    weights: weights/yolo11x.pt
     conf: 0.35
-    tracker: "bytetrack.yaml"
-    # Class COCO: 0: person, 1: bicycle, 2: car, 3: motorcycle, 5: bus, 7: truck
-    track_classes: [0, 1, 2, 3, 5, 7]
+    tracker: bytetrack.yaml
+    track_names: [bicycle, car, motorcycle, bus, truck]
   traffic_light:
-    weights: "yolov8s.pt"
-    class_id: 9 # class 'traffic light' trong COCO
+    weights: weights/yolov8s.pt  # COCO pretrained, class 9 là traffic light
     conf: 0.25
-    hsv_ranges:
-      RED:
-        lower1: [0, 100, 100]
-        upper1: [10, 255, 255]
-        lower2: [160, 100, 100]
-        upper2: [180, 255, 255]
-      YELLOW:
-        lower: [15, 100, 100]
-        upper: [35, 255, 255]
-      GREEN:
-        lower: [40, 100, 100]
-        upper: [90, 255, 255]
-  stopline_seg:
-    weights: "yolov8s-seg.pt"
-    conf: 0.30
-    classes: ["stop_line", "zebra_crossing"]
+    max_missing_frames: 10
 
 stopline_detector:
-  default_mode: "classical" # "classical" (Chế độ A) hoặc "ai" (Chế độ B)
-  
-  # Cấu hình Chế độ A - Baseline Cổ điển
   classical:
-    sample_frames: 200 # số frame đọc cách đều từ đầu video
+    sample_frames: 200
     roi:
-      y_min_ratio: 0.45 # chỉ xét vùng mặt đường hoạt động
+      y_min_ratio: 0.45
       y_max_ratio: 0.82
-    filter:
-      use_clahe: true # dùng CLAHE cân bằng độ tương phản cục bộ
-      clahe_clip_limit: 3.0
-      clahe_tile_grid: [8, 8]
-      adaptive_method: "gaussian" # "gaussian" hoặc "otsu"
-      canny_thresh: [40, 120]
-      hough_threshold: 30
-      hough_min_line_len: 30
-      hough_max_line_gap: 30
-      max_slope: 0.15 # góc nghiêng lọc sơ bộ
-      max_dy: 25
-    clustering:
-      collinear_dist_thresh: 25 # khoảng cách tối đa để gộp 2 đoạn thẳng cùng hướng
-      max_candidates: 30 # số ứng viên tối đa sinh ra
-    # HỆ THỐNG CHẤM ĐIỂM ĐA TIÊU CHÍ (MULTI-CRITERIA SCORING)
     scoring_weights:
-      angle_perpendicular: 0.30 # vạch vuông góc với dòng xe (song song bị loại)
-      trajectory_intersection: 0.25 # số quỹ đạo xe cắt qua vạch
-      stopped_cluster_distance: 0.20 # nằm ngay trước cụm xe dừng
-      relative_length: 0.15 # chiều dài so với bề rộng mặt đường
-      paint_contrast: 0.10 # độ tương phản biên cạnh vạch sơn thật (loại bóng nước/vệt phản chiếu)
+      angle_perpendicular: 0.30
+      trajectory_intersection: 0.25
+      stopped_cluster_distance: 0.20
+      relative_length: 0.15
+      paint_contrast: 0.10
     selection:
-      min_confidence_thresh: 0.52 # ngưỡng điểm tối thiểu để tự động chọn (dưới mức này sẽ cảnh báo và yêu cầu xác nhận)
-      top_k_candidates: 5 # lưu và hiển thị top-5 ứng viên sáng giá nhất
-      max_lines: 2 # hỗ trợ tự động chọn đến 2 vạch nếu video có 2 vạch (vạch dừng + vạch đi bộ)
-      secondary_distance_thresh: 48 # khoảng cách tối thiểu giữa 2 vạch (px)
-
-  # Cấu hình Chế độ B - Model AI (YOLO-seg)
-  ai:
-    sample_frames: 50
-    mask_conf: 0.35
-    zebra_assist: true # dùng vạch đi bộ làm tín hiệu định vị phụ
-    ema_alpha: 0.2 # hệ số làm mượt theo thời gian
+      min_confidence_thresh: 0.52
+      top_k_candidates: 5
+      max_lines: 2
+      secondary_distance_thresh: 48
 
 stabilization:
-  method: "ORB" # "ORB" hoặc "SIFT"
+  method: ORB
   max_features: 1000
-  ransac_thresh: 3.0
-  min_matches: 20
 
 violation_logic:
-  reference_point: "bottom_center" # trung điểm cạnh đáy bbox
-  min_violation_frames: 3 # số frame liên tiếp qua vạch để tránh nhiễu
-  allow_right_turn: false # cấu hình cho phép hay cấm rẽ phải khi đèn đỏ
-  right_turn_x_ratio: 0.75 # làn rẽ phải thường nằm bên mép phải (x > 75% W)
-
-penalties:
-  "O to":
-    fine_range: "4.000.000 - 6.000.000 VNĐ"
-    suspension: "Tước GPLX 1 - 3 tháng"
-    legal_code: "Nghị định 100/2019/NĐ-CP (sửa đổi NĐ 123/2021/NĐ-CP)"
-  "Xe may":
-    fine_range: "800.000 - 1.000.000 VNĐ"
-    suspension: "Tước GPLX 1 - 3 tháng"
-    legal_code: "Nghị định 100/2019/NĐ-CP"
-  "Xe tai":
-    fine_range: "4.000.000 - 6.000.000 VNĐ"
-    suspension: "Tước GPLX 1 - 3 tháng"
-    legal_code: "Nghị định 100/2019/NĐ-CP"
-  "Xe buyt":
-    fine_range: "4.000.000 - 6.000.000 VNĐ"
-    suspension: "Tước GPLX 1 - 3 tháng"
-    legal_code: "Nghị định 100/2019/NĐ-CP"
-  "Xe dap":
-    fine_range: "100.000 - 200.000 VNĐ"
-    suspension: "Không tước GPLX"
-    legal_code: "Nghị định 100/2019/NĐ-CP"
+  min_violation_frames: 3
+  allow_right_turn: false
+  right_turn_x_ratio: 0.75
