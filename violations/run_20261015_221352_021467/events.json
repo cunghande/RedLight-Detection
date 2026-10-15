@@ -1,0 +1,38 @@
+[
+  {
+    "violation_number": 1,
+    "event_id": "EV-20261015-221407-997004-0015",
+    "track_id": 15,
+    "vehicle_type": "O to",
+    "confidence": 0.77,
+    "frame_index": 58,
+    "timestamp": "2026-10-15 22:14:07",
+    "stop_line_violated": "VACH 1",
+    "scene_image": "EV-20261015-221407-997004-0015_scene.jpg",
+    "vehicle_crop_image": "EV-20261015-221407-997004-0015_vehicle.jpg",
+    "gate_id": "gate_1",
+    "crossing_frame": 56,
+    "light_at_crossing": "RED",
+    "status": "confirmed_red_crossing",
+    "confirmed_frame": 58,
+    "video_time_seconds": 1.833
+  },
+  {
+    "violation_number": 2,
+    "event_id": "EV-20261015-221414-872687-0025",
+    "track_id": 25,
+    "vehicle_type": "O to",
+    "confidence": 0.89,
+    "frame_index": 91,
+    "timestamp": "2026-10-15 22:14:14",
+    "stop_line_violated": "VACH 1",
+    "scene_image": "EV-20261015-221414-872687-0025_scene.jpg",
+    "vehicle_crop_image": "EV-20261015-221414-872687-0025_vehicle.jpg",
+    "gate_id": "gate_1",
+    "crossing_frame": 89,
+    "light_at_crossing": "RED",
+    "status": "confirmed_red_crossing",
+    "confirmed_frame": 91,
+    "video_time_seconds": 2.933
+  }
+]

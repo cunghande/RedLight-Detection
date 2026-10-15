@@ -1,0 +1,14 @@
+[
+  {
+    "violation_number": 1,
+    "event_id": "EV-20261015-203612-594877-0019",
+    "track_id": 19,
+    "vehicle_type": "O to",
+    "confidence": 0.87,
+    "frame_index": 91,
+    "timestamp": "2026-10-15 20:36:12",
+    "stop_line_violated": "Vach dung (Xac nhan - Y=680)",
+    "scene_image": "EV-20261015-203612-594877-0019_scene.jpg",
+    "vehicle_crop_image": "EV-20261015-203612-594877-0019_vehicle.jpg"
+  }
+]

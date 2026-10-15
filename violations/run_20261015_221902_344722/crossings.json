@@ -1,0 +1,9 @@
+[
+  {
+    "track_id": 11,
+    "gate_id": "gate_1",
+    "crossing_frame": 92,
+    "light_at_crossing": "RED",
+    "status": "confirmed_red_crossing"
+  }
+]

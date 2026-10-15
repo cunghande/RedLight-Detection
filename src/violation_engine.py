@@ -5,6 +5,7 @@ from typing import Dict, List, Optional, Set, Tuple
 
 import cv2
 import numpy as np
+from src.crossing_tracker import CrossingTracker
 
 logger = logging.getLogger("ViolationEngine")
 
@@ -15,8 +16,8 @@ class ViolationEngine:
     - Sử dụng khoảng cách có dấu: d = (x - x1)*(y2 - y1) - (y - y1)*(x2 - x1)
     - Nhận biết đổi dấu của d khi xe cắt qua vạch dừng TRONG LÚC ĐÈN ĐỎ.
     - Bộ lọc giảm báo sai (Anti-False-Alarm):
-        1. Bỏ qua xe đã vượt qua vạch trước khi đèn đỏ bật.
-        2. Yêu cầu vi phạm duy trì ít nhất K frame liên tiếp (mặc định K=3).
+        1. Cần quan sát xe phía trước vạch và cắt đoạn vạch đúng chiều.
+        2. Ghi màu ở thời điểm cắt; xác nhận vị trí qua K quan sát, chấp nhận mất track ngắn.
         3. Hỗ trợ cấu hình ngoại lệ rẽ phải (Right-turn exception).
         4. Mỗi ID phương tiện (Track ID) chỉ ghi nhận một sự kiện trong một lượt chạy.
     """
@@ -27,7 +28,10 @@ class ViolationEngine:
         output_dir: Path,
         min_violation_frames: int = 3,
         allow_right_turn: bool = False,
-        right_turn_x_ratio: float = 0.75
+        right_turn_x_ratio: float = 0.75,
+        crossing_margin_px: float = 2.0,
+        max_track_gap_frames: int = 5,
+        fps: float = 25.0,
     ):
         self.stop_lines = stop_lines
         self.output_dir = Path(output_dir)
@@ -35,14 +39,12 @@ class ViolationEngine:
         self.min_violation_frames = min_violation_frames
         self.allow_right_turn = allow_right_turn
         self.right_turn_x_ratio = right_turn_x_ratio
+        self.fps = fps
+        self.crossing_tracker = CrossingTracker(min_violation_frames, crossing_margin_px, max_track_gap_frames)
 
         # Quản lý trạng thái từng phương tiện (Track ID)
         self.previous_positions: Dict[int, Tuple[int, int]] = {}
-        self.previous_signs: Dict[int, Dict[str, float]] = {} # {track_id: {line_id: sign}}
         self.violated_ids: Set[int] = set()
-        self.violation_consecutive_counts: Dict[Tuple[int, str], int] = {}
-        self.violation_last_frame: Dict[Tuple[int, str], int] = {}
-        self.passed_before_red: Set[int] = set() # Các xe đã qua vạch trước khi đèn đỏ
         self.violations_log: List[Dict] = []
 
     def update_stop_lines(self, new_lines: List[Dict]):
@@ -74,17 +76,24 @@ class ViolationEngine:
         h, w = frame.shape[:2]
 
         # 1. Vẽ các vạch dừng lên khung hình
-        line_color = (0, 0, 255) if traffic_state == "RED" else (
-            (0, 255, 255) if traffic_state == "YELLOW" else (0, 255, 0)
-        )
+        line_colors = {
+            "RED": (0, 0, 255),
+            "YELLOW": (0, 255, 255),
+            "GREEN": (0, 255, 0),
+            "UNKNOWN": (160, 160, 160),
+        }
         for s in self.stop_lines:
+            signal = traffic_state.get(s['id'], 'UNKNOWN') if isinstance(traffic_state, dict) else traffic_state
+            line_color = line_colors.get(signal, line_colors['UNKNOWN'])
             p1, p2 = s["line"]
+            p1, p2 = tuple(map(int, p1)), tuple(map(int, p2))
             cv2.line(annotated_frame, p1, p2, line_color, 4)
             cv2.putText(
                 annotated_frame, s["name"], (p1[0], max(25, p1[1] - 8)),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.55, line_color, 2
             )
 
+        self.crossing_tracker.prune(frame_idx)
         # 2. Xử lý từng phương tiện
         for tr in tracks:
             track_id = tr["id"]
@@ -95,46 +104,22 @@ class ViolationEngine:
             # Điểm tham chiếu: trung điểm cạnh đáy bbox
             ref_pt = (int((x1 + x2) / 2), int(y2))
 
-            # Tính toán khoảng cách có dấu tới từng vạch dừng
-            if track_id not in self.previous_signs:
-                self.previous_signs[track_id] = {}
-
             for line_cfg in self.stop_lines:
-                line_id = line_cfg["id"]
-                current_d = self._compute_signed_distance(ref_pt, line_cfg["line"])
-                start, end = line_cfg["line"]
-                line_sign = 1 if end[0] >= start[0] else -1
-                direction = line_cfg.get("direction", "TOP_TO_BOTTOM")
-                current_after = current_d * line_sign * (1 if direction == "BOTTOM_TO_TOP" else -1) > 0
-                prev_d = self.previous_signs[track_id].get(line_id)
-                prev_after = (prev_d * line_sign * (1 if direction == "BOTTOM_TO_TOP" else -1) > 0
-                              if prev_d is not None else None)
-                key = (track_id, line_id)
-
-                if traffic_state != "RED":
-                    self.violation_consecutive_counts.pop(key, None)
-                    if current_after:
-                        self.passed_before_red.add(track_id)
-                elif track_id not in self.violated_ids and track_id not in self.passed_before_red:
-                    in_segment = min(start[0], end[0]) <= ref_pt[0] <= max(start[0], end[0])
-                    crossing = prev_after is False and current_after and in_segment
-                    if crossing and self.allow_right_turn and ref_pt[0] >= w * self.right_turn_x_ratio:
-                        crossing = False
-                    continuing = (key in self.violation_consecutive_counts and current_after
-                                  and self.violation_last_frame.get(key) == frame_idx - 1)
-                    if crossing or continuing:
-                        count = self.violation_consecutive_counts.get(key, 0) + 1
-                        self.violation_consecutive_counts[key] = count
-                        self.violation_last_frame[key] = frame_idx
-                        if count >= self.min_violation_frames:
-                            self.violated_ids.add(track_id)
-                            current_frame_violations.append(self._record_violation(
-                                frame=frame, box=[x1, y1, x2, y2], track_id=track_id,
-                                cls_name=cls_name, conf=conf, frame_idx=frame_idx, line_cfg=line_cfg))
-                    elif not current_after or key in self.violation_consecutive_counts:
-                        self.violation_consecutive_counts.pop(key, None)
-
-                self.previous_signs[track_id][line_id] = current_d
+                signal = traffic_state.get(line_cfg['id'], 'UNKNOWN') if isinstance(traffic_state, dict) else traffic_state
+                anchor_x, anchor_y = line_cfg.get('anchor', [0.5, 1.0])
+                gate_point = (float(x1 + (x2 - x1) * anchor_x), float(y1 + (y2 - y1) * anchor_y))
+                lane = line_cfg.get('lane_polygon')
+                if lane and cv2.pointPolygonTest(np.asarray(lane, dtype=np.float32), gate_point, False) < 0:
+                    continue
+                crossing = self.crossing_tracker.update(track_id, gate_point, line_cfg, signal, frame_idx)
+                if crossing and track_id not in self.violated_ids:
+                    if self.allow_right_turn and gate_point[0] >= w * self.right_turn_x_ratio:
+                        continue
+                    self.violated_ids.add(track_id)
+                    self._crossing_evidence = crossing
+                    current_frame_violations.append(self._record_violation(
+                        frame=frame, box=[x1, y1, x2, y2], track_id=track_id,
+                        cls_name=cls_name, conf=conf, frame_idx=frame_idx, line_cfg=line_cfg))
 
             self.previous_positions[track_id] = ref_pt
 
@@ -200,6 +185,7 @@ class ViolationEngine:
             cv2.imwrite(str(crop_filename), crop_img)
 
         entry = {
+            "violation_number": len(self.violations_log) + 1,
             "event_id": event_id,
             "track_id": track_id,
             "vehicle_type": cls_name,
@@ -210,7 +196,12 @@ class ViolationEngine:
             "scene_image": str(scene_filename.name),
             "vehicle_crop_image": str(crop_filename.name)
         }
+        entry.update(getattr(self, '_crossing_evidence', {}))
+        entry['video_time_seconds'] = round((entry.get('crossing_frame', frame_idx) - 1) / self.fps, 3)
 
         self.violations_log.append(entry)
-        logger.warning("[CẦN KIỂM TRA] %s | %s (ID:%s) | %s", event_id, cls_name, track_id, line_name)
+        logger.warning(
+            "[VI PHẠM +1] Tổng: %s | ID:%s | %s | %s | %s",
+            len(self.violations_log), track_id, cls_name, line_name, event_id,
+        )
         return entry

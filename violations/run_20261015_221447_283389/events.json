@@ -1,0 +1,20 @@
+[
+  {
+    "violation_number": 1,
+    "event_id": "EV-20261015-221511-604060-0018",
+    "track_id": 18,
+    "vehicle_type": "O to",
+    "confidence": 0.93,
+    "frame_index": 106,
+    "timestamp": "2026-10-15 22:15:11",
+    "stop_line_violated": "VACH 1",
+    "scene_image": "EV-20261015-221511-604060-0018_scene.jpg",
+    "vehicle_crop_image": "EV-20261015-221511-604060-0018_vehicle.jpg",
+    "gate_id": "gate_1",
+    "crossing_frame": 104,
+    "light_at_crossing": "RED",
+    "status": "confirmed_red_crossing",
+    "confirmed_frame": 106,
+    "video_time_seconds": 3.433
+  }
+]

@@ -34,3 +34,4 @@ weights/*
 .pytest_cache/
 *.ipynb_checkpoints/
 traffic_results/
+scene_dataset/

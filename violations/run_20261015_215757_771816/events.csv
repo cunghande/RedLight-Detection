@@ -1,0 +1,3 @@
+﻿violation_number,event_id,track_id,vehicle_type,confidence,frame_index,timestamp,stop_line_violated,scene_image,vehicle_crop_image,crossing_frame,confirmed_frame,video_time_seconds,light_at_crossing,gate_id,status
+1,EV-20261015-215823-727279-0015,15,O to,0.76,65,2026-10-15 21:58:23,Vach 2 (Chon tu dong - Y=631),EV-20261015-215823-727279-0015_scene.jpg,EV-20261015-215823-727279-0015_vehicle.jpg,63,65,2.067,RED,stop_line_2,confirmed_red_crossing
+2,EV-20261015-215833-782514-0025,25,O to,0.87,93,2026-10-15 21:58:33,Vach 1 (Chon tu dong - Y=681),EV-20261015-215833-782514-0025_scene.jpg,EV-20261015-215833-782514-0025_vehicle.jpg,91,93,3.0,RED,stop_line_1,confirmed_red_crossing

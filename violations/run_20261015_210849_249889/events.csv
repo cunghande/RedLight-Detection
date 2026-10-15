@@ -1,0 +1,2 @@
+﻿violation_number,event_id,track_id,vehicle_type,confidence,frame_index,timestamp,stop_line_violated,scene_image,vehicle_crop_image,crossing_frame,confirmed_frame,video_time_seconds,light_at_crossing,gate_id,status
+1,EV-20261015-210906-820275-0001,1,O to,0.94,83,2026-10-15 21:09:06,LAN DI THANG,EV-20261015-210906-820275-0001_scene.jpg,EV-20261015-210906-820275-0001_vehicle.jpg,81,83,2.667,RED,gate_1,confirmed_red_crossing

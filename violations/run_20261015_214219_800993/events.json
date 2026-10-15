@@ -1,0 +1,38 @@
+[
+  {
+    "violation_number": 1,
+    "event_id": "EV-20261015-214251-548410-0015",
+    "track_id": 15,
+    "vehicle_type": "O to",
+    "confidence": 0.76,
+    "frame_index": 65,
+    "timestamp": "2026-10-15 21:42:51",
+    "stop_line_violated": "Vach 2 (Chon tu dong - Y=631)",
+    "scene_image": "EV-20261015-214251-548410-0015_scene.jpg",
+    "vehicle_crop_image": "EV-20261015-214251-548410-0015_vehicle.jpg",
+    "gate_id": "stop_line_2",
+    "crossing_frame": 63,
+    "light_at_crossing": "RED",
+    "status": "confirmed_red_crossing",
+    "confirmed_frame": 65,
+    "video_time_seconds": 2.067
+  },
+  {
+    "violation_number": 2,
+    "event_id": "EV-20261015-214304-784644-0025",
+    "track_id": 25,
+    "vehicle_type": "O to",
+    "confidence": 0.87,
+    "frame_index": 93,
+    "timestamp": "2026-10-15 21:43:04",
+    "stop_line_violated": "Vach 1 (Chon tu dong - Y=681)",
+    "scene_image": "EV-20261015-214304-784644-0025_scene.jpg",
+    "vehicle_crop_image": "EV-20261015-214304-784644-0025_vehicle.jpg",
+    "gate_id": "stop_line_1",
+    "crossing_frame": 91,
+    "light_at_crossing": "RED",
+    "status": "confirmed_red_crossing",
+    "confirmed_frame": 93,
+    "video_time_seconds": 3.0
+  }
+]

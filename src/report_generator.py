@@ -5,8 +5,9 @@ import json
 from pathlib import Path
 
 
-FIELDS = ("event_id", "track_id", "vehicle_type", "confidence", "frame_index",
-          "timestamp", "stop_line_violated", "scene_image", "vehicle_crop_image")
+FIELDS = ("violation_number", "event_id", "track_id", "vehicle_type", "confidence", "frame_index",
+          "timestamp", "stop_line_violated", "scene_image", "vehicle_crop_image",
+          "crossing_frame", "confirmed_frame", "video_time_seconds", "light_at_crossing", "gate_id", "status")
 
 
 class ReportGenerator:
@@ -25,10 +26,11 @@ class ReportGenerator:
 
         lines = ["# Sự kiện nghi vượt đèn đỏ", "",
                  f"Số sự kiện cần kiểm tra: {len(events)}", "",
-                 "| Mã sự kiện | Xe | Frame | Thời gian | Vạch |",
-                 "|---|---|---:|---|---|"]
-        for event in events:
-            lines.append(f"| {event['event_id']} | {event['vehicle_type']} | "
+                 "| STT | Mã sự kiện | Track ID | Xe | Frame | Thời gian | Vạch |",
+                 "|---:|---|---:|---|---:|---|---|"]
+        for index, event in enumerate(events, 1):
+            lines.append(f"| {event.get('violation_number', index)} | {event['event_id']} | "
+                         f"{event['track_id']} | {event['vehicle_type']} | "
                          f"{event['frame_index']} | {event['timestamp']} | "
                          f"{event['stop_line_violated']} |")
         lines.extend(["", "Các sự kiện do thuật toán đề xuất; cần xem ảnh và video để xác nhận."])

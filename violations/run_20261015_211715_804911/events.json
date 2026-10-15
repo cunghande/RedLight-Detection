@@ -1,0 +1,20 @@
+[
+  {
+    "violation_number": 1,
+    "event_id": "EV-20261015-211734-919692-0001",
+    "track_id": 1,
+    "vehicle_type": "O to",
+    "confidence": 0.94,
+    "frame_index": 83,
+    "timestamp": "2026-10-15 21:17:34",
+    "stop_line_violated": "LAN DI THANG",
+    "scene_image": "EV-20261015-211734-919692-0001_scene.jpg",
+    "vehicle_crop_image": "EV-20261015-211734-919692-0001_vehicle.jpg",
+    "gate_id": "gate_1",
+    "crossing_frame": 81,
+    "light_at_crossing": "RED",
+    "status": "confirmed_red_crossing",
+    "confirmed_frame": 83,
+    "video_time_seconds": 2.667
+  }
+]

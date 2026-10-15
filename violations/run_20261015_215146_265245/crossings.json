@@ -1,0 +1,9 @@
+[
+  {
+    "track_id": 1,
+    "gate_id": "gate_1",
+    "crossing_frame": 80,
+    "light_at_crossing": "UNKNOWN",
+    "status": "review_unknown_light"
+  }
+]

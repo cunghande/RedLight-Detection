@@ -1,25 +1,25 @@
 {
   "camera_id": "cam_red1",
-  "source_video": "dataset_videos/red1.mp4",
-  "detector_mode": "ai_maskrcnn",
+  "source_video": "dataset_videos\\red1.mp4",
+  "detector_mode": "manual_confirmed",
   "total_lines": 1,
   "lines": [
     {
       "id": "stop_line_1",
-      "name": "Vach 1 (Mask R-CNN - Y=685)",
+      "name": "Vach dung (Xac nhan - Y=680)",
       "line": [
         [
-          0,
-          681
+          1066,
+          726
         ],
         [
-          1079,
-          689
+          9,
+          634
         ]
       ],
       "direction": "BOTTOM_TO_TOP",
-      "confidence": 0.951,
-      "method": "ai_maskrcnn_segmentation"
+      "confidence": 1.0,
+      "method": "manual_confirmed"
     }
   ]
 }

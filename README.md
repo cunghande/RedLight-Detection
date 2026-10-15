@@ -1,57 +1,85 @@
-# Phát hiện phương tiện vượt đèn đỏ
+﻿# Phát hiện phương tiện vượt đèn đỏ
 
-Pipeline video: **YOLO11x → ByteTrack → vạch dừng + trạng thái đèn → sự kiện nghi vượt đèn đỏ → video/báo cáo**.
-`weights/yolo11x.pt` là model phương tiện đã fine-tune trên tập con COCO với năm lớp
-`bicycle`, `car`, `motorcycle`, `bus`, `truck`. `weights/yolov8s.pt` là model COCO
-đã train sẵn, dùng để tìm cụm đèn (class 9); màu đèn được phân tích bằng HSV.
-Notebook phương tiện không huấn luyện model đèn hay vạch dừng. Vạch được lấy từ
-cache theo camera hoặc đề xuất bằng CV và quỹ đạo xe; nên xác nhận trước khi chạy.
+Dự án nhận diện phương tiện, theo dõi ID theo thời gian, đọc màu đèn giao thông và ghi nhận xe cắt qua vạch dừng khi đèn đỏ. Kết quả dùng để kiểm tra video; cần xem lại bằng chứng trước khi đưa ra kết luận thực tế.
 
-## Chạy video
+## Cài đặt
 
 ```powershell
 pip install -r requirements.txt
-python preview_stopline.py --video dataset_videos/red1.mp4 --camera-id cam_red1
-python main.py --video dataset_videos/red1.mp4 --camera-id cam_red1 --headless --output output_violation.mp4
+python download_models.py
 ```
 
-Ở cửa sổ preview, chỉnh vạch bằng hai lần nhấp rồi nhấn `s` để lưu. Nếu thay góc
-camera, dùng `--redetect` và xác nhận lại vạch. Cache từ Mask R-CNN cũ được bỏ qua.
-Không tái sử dụng cùng `camera-id` cho hai góc nhìn khác nhau.
+Kiểm tra GPU NVIDIA:
 
-Video đầu ra được ghi theo `--output`; ảnh và báo cáo sự kiện nằm trong thư mục
-`violations/run_.../` riêng cho mỗi lượt chạy.
-Đây là kết quả thử nghiệm: cần xem lại vạch, trạng thái đèn và ảnh sự kiện trước khi
-kết luận có vi phạm. Khi không nhìn thấy đèn đủ lâu, trạng thái chuyển thành `UNKNOWN`
-và hệ thống không kết luận xe vượt đèn đỏ ở những frame đó.
+```powershell
+python -c "import torch; print(torch.cuda.is_available()); print(torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'CPU')"
+```
 
-## Huấn luyện và kết quả
+## Chạy video mới: tự phát hiện
 
-Notebook đã chạy trên Modal H100: [`notebooks/train-traffic-3-models-modal-h100.ipynb`](notebooks/train-traffic-3-models-modal-h100.ipynb).
-Notebook và `weights/yolo11x.pt` đã được giữ nguyên sau lượt train. ZIP đầy đủ do Modal
-xuất chứa SSD300-VGG16 (baseline), YOLOv8s và YOLO11x đã fine-tune,
-cùng checkpoint và hình/bảng dùng cho paper. Lưu ZIP gốc ở nơi lưu kết quả ngoài repo.
-YOLOv8s trong ZIP là **model 5 lớp phương tiện**, khác với `weights/yolov8s.pt` COCO
-80 lớp đang dùng để tìm đèn.
+Chế độ mặc định tự tìm vạch dừng, tự tìm đèn và theo dõi xe. Nó phù hợp để thử nhanh một video chưa từng có cấu hình.
 
-Trên 200 ảnh test COCO subset, mAP50–95 lần lượt là **0,257 (SSD)**,
-**0,318 (YOLOv8s)** và **0,309 (YOLO11x)**. Vì vậy kết quả hiện tại chưa cho thấy
-YOLO11x chính xác hơn YOLOv8s. Pipeline vẫn chọn YOLO11x theo cấu hình hiện tại;
-cần đánh giá trên video camera thực tế trước khi quyết định model triển khai.
-Xem [hướng dẫn Modal](docs/MODAL_GUIDE.md), [dataset](docs/DATASET_GUIDE.md),
-[paper](docs/PAPER_GUIDE.md).
+```powershell
+python main.py --video dataset_videos/red1.mp4 --device 0 --scene-calibrated --output output_red1_new.mp4
+```
 
-## Các phần chính
+Thêm `--headless` nếu chỉ muốn xuất file mà không mở cửa sổ xem trực tiếp:
+
+```powershell
+python main.py --video dataset_videos/red1.mp4 --device 0 --headless --output output_red1_new.mp4
+```
+
+Lần chạy đầu có thể chậm do quét ứng viên vạch. Cache vạch tự tìm được lưu ở `configs/<tên-video>.json`. Dùng `--redetect` để quét lại:
+
+```powershell
+python main.py --video dataset_videos/red1.mp4 --device 0 --redetect --headless
+```
+
+## Chạy chính xác hơn: hiệu chỉnh 4 điểm
+
+Với một góc camera cụ thể, hiệu chỉnh thủ công giúp loại bỏ lỗi chọn nhầm vạch hoặc nhầm cụm đèn. Chạy:
+
+```powershell
+python main.py --video dataset_videos/red1.mp4 --device 0 --calibrate --output output_red1_new.mp4
+```
+
+Trong cửa sổ hiệu chỉnh:
+
+1. Bấm hai đầu của vạch dừng.
+2. Bấm hai góc bao sát cụm đèn đang điều khiển luồng xe đó.
+3. Nhấn `S` để lưu; `U` bỏ điểm gần nhất; `R` làm lại; `Q` hủy.
+
+Cấu hình gồm đúng bốn điểm. Không cần gán nhãn xe hoặc gán từng khung hình. File cấu hình lưu tại `configs/scenes/` và gắn với đúng video.
+
+Sau khi lưu, chạy bằng cấu hình đã hiệu chỉnh:
+
+```powershell
+python main.py --video dataset_videos/red1.mp4 --device 0 --scene-calibrated --output output_red1_new.mp4
+```
+
+Thêm `--headless` vào lệnh trên nếu không cần xem video khi xử lý. Nếu có nhiều video mới, thay `red1.mp4` bằng `red2.mp4` đến `red10.mp4` và hiệu chỉnh riêng khi muốn dùng chế độ chính xác hơn.
+
+## Kết quả
+
+- Video đã vẽ bbox, ID, màu đèn, vạch và số vi phạm được lưu theo `--output`.
+- Mỗi lần chạy tạo `violations/run_.../` chứa `events.json`, `events.csv`, `events.md`, ảnh bằng chứng và chẩn đoán theo frame.
+- Mỗi ID xe chỉ được ghi một lần trong một lượt chạy.
+
+## Thành phần chính
 
 | Đường dẫn | Vai trò |
 |---|---|
-| `main.py` | Điều phối video, tracking, đèn, vạch và báo cáo |
-| `config.yaml` | Trọng số và tham số pipeline |
-| `src/stopline_detector.py`, `src/trajectory_analyzer.py` | Đề xuất vạch dừng từ ảnh và quỹ đạo xe |
-| `src/traffic_light_detector.py` | Nhận diện cụm đèn và màu đèn |
-| `src/violation_engine.py`, `src/report_generator.py` | Kiểm tra xe qua vạch khi đỏ và xuất sự kiện |
-| `preview_stopline.py` | Xem, chỉnh và lưu vạch theo camera |
-| `dataset_videos/` | Video mẫu; `configs/` là cache vạch theo camera |
-| `training/`, `tests/` | Mã huấn luyện tham chiếu và kiểm tra cục bộ |
+| `main.py` | Điều phối pipeline video và tham số dòng lệnh |
+| `calibrate_scene.py` | Giao diện hiệu chỉnh nhanh vạch và cụm đèn |
+| `src/stopline_detector.py` | Tự đề xuất vạch dừng cho video mới |
+| `src/traffic_light_detector.py` | Tìm đèn và đọc màu đèn |
+| `src/light_classifier.py` | Classifier màu đèn pretrained |
+| `src/crossing_tracker.py` | Theo dõi xe cắt đoạn vạch |
+| `src/violation_engine.py` | Ghi nhận sự kiện vượt đèn đỏ |
+| `weights/` | Trọng số model |
 
-Kiểm tra mã và pipeline mẫu: `python -m pytest tests -q`.
+## Kiểm thử
+
+```powershell
+python -m pytest tests -q
+```
