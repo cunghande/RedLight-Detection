@@ -1,0 +1,11 @@
+{"schema":"openai.presentation.layout/v5","unit":"px","slide":{"id":"sl/p3krxq","index":6,"layout":{"id":"ly/nedsf6x8","name":"Blank"},"backgroundColor":"rgba(255,255,255,1)","position":{"left":0,"top":0,"width":1280,"height":720}},
+"elements":[
+{"id":"sh/fqd832ts","kind":"textbox","position":{"left":72,"top":42,"width":1010,"height":50},"text":"Logic xác nhận vi phạm","style":{"fontSize":34,"typeface":"Arial","color":"#172A3A","bold":true,"alignment":"left"},"geometry":"rect","lineWidth":0},
+{"id":"sh/grm9c7ad","kind":"shape","position":{"left":72,"top":124,"width":1136,"height":2},"geometry":"rect","fillColor":"#CFD8DD","lineWidth":0},
+{"id":"sh/hsvq5sby","kind":"textbox","position":{"left":1150,"top":44,"width":58,"height":32},"text":"07","style":{"fontSize":17,"typeface":"Arial","color":"#5F6B76","bold":true,"alignment":"right"},"geometry":"rect","lineWidth":0},
+{"id":"im/vulo3654","kind":"image","position":{"left":72,"top":155,"width":635,"height":500},"geometry":"rect","fit":"contain","alt":"Chuỗi sáu khung hình theo dõi xe cắt vạch khi đèn đỏ"},
+{"id":"sh/3ex872to","kind":"textbox","position":{"left":760,"top":172,"width":430,"height":72},"text":"Sự kiện chỉ được ghi khi đủ bằng chứng","style":{"fontSize":29,"typeface":"Arial","color":"#172A3A","bold":true,"alignment":"left"},"geometry":"rect","lineWidth":0},
+{"id":"sh/4f69g7a9","kind":"textbox","position":{"left":760,"top":270,"width":430,"height":280},"text":"ID xe đã xuất hiện ở phía trước vạch.\nĐoạn quỹ đạo cắt đúng đoạn vạch theo hướng giám sát.\nĐèn ở trạng thái RED tại thời điểm cắt.\nXe tiếp tục ở phía sau vạch trong 3 frame.\nXe quay lại trước khi đủ xác nhận thì ứng viên bị hủy.","style":{"fontSize":20,"typeface":"Arial","color":"#17212B","alignment":"left"},"geometry":"rect","lineWidth":0},
+{"id":"sh/pgfq9cbu","kind":"textbox","position":{"left":760,"top":580,"width":430,"height":64},"text":"Frame cắt và frame xác nhận được lưu riêng để giữ đúng mốc thời gian.","style":{"fontSize":19,"typeface":"Arial","color":"#236B8E","bold":true,"alignment":"left"},"geometry":"rect","lineWidth":0},
+{"id":"sh/ixk72dsz","kind":"textbox","position":{"left":72,"top":680,"width":450,"height":20},"text":"Nguyễn Tuấn Anh  ·  Lớp 124231","style":{"fontSize":12,"typeface":"Arial","color":"#7D8790","alignment":"left"},"geometry":"rect","lineWidth":0}
+]}

@@ -1,0 +1,12 @@
+{"schema":"openai.presentation.layout/v5","unit":"px","slide":{"id":"sl/xw6lkk","index":8,"layout":{"id":"ly/nedsf6x8","name":"Blank"},"backgroundColor":"rgba(255,255,255,1)","position":{"left":0,"top":0,"width":1280,"height":720}},
+"elements":[
+{"id":"sh/x0zmhoz6","kind":"textbox","position":{"left":72,"top":42,"width":1010,"height":50},"text":"Tốc độ và bằng chứng sự kiện","style":{"fontSize":34,"typeface":"Arial","color":"#172A3A","bold":true,"alignment":"left"},"geometry":"rect","lineWidth":0},
+{"id":"sh/axonm9gf","kind":"shape","position":{"left":72,"top":124,"width":1136,"height":2},"geometry":"rect","fillColor":"#CFD8DD","lineWidth":0},
+{"id":"sh/byh4feh0","kind":"textbox","position":{"left":1150,"top":44,"width":58,"height":32},"text":"09","style":{"fontSize":17,"typeface":"Arial","color":"#5F6B76","bold":true,"alignment":"right"},"geometry":"rect","lineWidth":0},
+{"id":"ch/4b2hwfed","kind":"chart","position":{"left":55,"top":170,"width":560,"height":360},"chartType":"bar"},
+{"id":"sh/lozml8z2","kind":"textbox","position":{"left":72,"top":560,"width":530,"height":70},"text":"SSD nhanh nhất; YOLOv8s có độ chính xác cao hơn và chỉ 11,1 triệu tham số.","style":{"fontSize":20,"typeface":"Arial","color":"#172A3A","bold":true,"alignment":"left"},"geometry":"rect","lineWidth":0},
+{"id":"im/jehkb61k","kind":"image","position":{"left":680,"top":165,"width":245,"height":330},"geometry":"rect","fit":"cover","alt":"Ảnh bằng chứng sự kiện thứ nhất"},
+{"id":"im/id8j21kz","kind":"image","position":{"left":955,"top":165,"width":245,"height":330},"geometry":"rect","fit":"cover","alt":"Ảnh bằng chứng sự kiện thứ hai"},
+{"id":"sh/8ra5w3yt","kind":"textbox","position":{"left":680,"top":530,"width":520,"height":78},"text":"Ảnh toàn cảnh giữ đồng thời phương tiện, vạch và trạng thái nút giao để người vận hành kiểm tra lại.","style":{"fontSize":20,"typeface":"Arial","color":"#5F6B76","alignment":"left"},"geometry":"rect","lineWidth":0},
+{"id":"sh/tsj6p8ze","kind":"textbox","position":{"left":72,"top":680,"width":450,"height":20},"text":"Nguyễn Tuấn Anh  ·  Lớp 124231","style":{"fontSize":12,"typeface":"Arial","color":"#7D8790","alignment":"left"},"geometry":"rect","lineWidth":0}
+]}

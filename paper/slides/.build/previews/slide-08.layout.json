@@ -1,0 +1,15 @@
+{"schema":"openai.presentation.layout/v5","unit":"px","slide":{"id":"sl/zvbrl3","index":7,"layout":{"id":"ly/nedsf6x8","name":"Blank"},"backgroundColor":"rgba(255,255,255,1)","position":{"left":0,"top":0,"width":1280,"height":720}},
+"elements":[
+{"id":"sh/pw32dgr2","kind":"textbox","position":{"left":72,"top":42,"width":1010,"height":50},"text":"Kết quả đánh giá detector","style":{"fontSize":34,"typeface":"Arial","color":"#172A3A","bold":true,"alignment":"left"},"geometry":"rect","lineWidth":0},
+{"id":"sh/2tsji18b","kind":"textbox","position":{"left":74,"top":95,"width":1000,"height":28},"text":"200 ảnh test, confidence 0,25 và IoU 0,50","style":{"fontSize":17,"typeface":"Arial","color":"#5F6B76","alignment":"left"},"geometry":"rect","lineWidth":0},
+{"id":"sh/nulkb69w","kind":"shape","position":{"left":72,"top":124,"width":1136,"height":2},"geometry":"rect","fillColor":"#CFD8DD","lineWidth":0},
+{"id":"sh/0ra1gbq5","kind":"textbox","position":{"left":1150,"top":44,"width":58,"height":32},"text":"08","style":{"fontSize":17,"typeface":"Arial","color":"#5F6B76","bold":true,"alignment":"right"},"geometry":"rect","lineWidth":0},
+{"id":"ch/1sjm94be","kind":"chart","position":{"left":60,"top":160,"width":790,"height":440},"chartType":"bar"},
+{"id":"sh/epsje18f","kind":"textbox","position":{"left":900,"top":185,"width":260,"height":52},"text":"YOLOv8s","style":{"fontSize":36,"typeface":"Arial","color":"#236B8E","bold":true,"alignment":"left"},"geometry":"rect","lineWidth":0},
+{"id":"sh/fq107690","kind":"textbox","position":{"left":900,"top":242,"width":260,"height":30},"text":"mAP cao nhất","style":{"fontSize":18,"typeface":"Arial","color":"#5F6B76","alignment":"left"},"geometry":"rect","lineWidth":0},
+{"id":"sh/kne1svqp","kind":"textbox","position":{"left":900,"top":286,"width":240,"height":72},"text":"0,318","style":{"fontSize":48,"typeface":"Arial","color":"#172A3A","bold":true,"alignment":"left"},"geometry":"rect","lineWidth":0},
+{"id":"sh/lon2l07a","kind":"textbox","position":{"left":900,"top":370,"width":250,"height":38},"text":"F1 = 0,529","style":{"fontSize":26,"typeface":"Arial","color":"#17212B","bold":true,"alignment":"left"},"geometry":"rect","lineWidth":0},
+{"id":"sh/lgnap07u","kind":"textbox","position":{"left":900,"top":458,"width":250,"height":40},"text":"119,9 FPS","style":{"fontSize":28,"typeface":"Arial","color":"#3B7D61","bold":true,"alignment":"left"},"geometry":"rect","lineWidth":0},
+{"id":"sh/0fe9wv69","kind":"textbox","position":{"left":900,"top":510,"width":275,"height":76},"text":"Đo batch 1, FP32 trên NVIDIA H100. FPS chỉ tính detector.","style":{"fontSize":17,"typeface":"Arial","color":"#5F6B76","alignment":"left"},"geometry":"rect","lineWidth":0},
+{"id":"sh/ze5snqpo","kind":"textbox","position":{"left":72,"top":680,"width":450,"height":20},"text":"Nguyễn Tuấn Anh  ·  Lớp 124231","style":{"fontSize":12,"typeface":"Arial","color":"#7D8790","alignment":"left"},"geometry":"rect","lineWidth":0}
+]}

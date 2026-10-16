@@ -1,4 +1,4 @@
-﻿# Phát hiện phương tiện vượt đèn đỏ
+# Phát hiện phương tiện vượt đèn đỏ
 
 Dự án nhận diện phương tiện, theo dõi ID theo thời gian, đọc màu đèn giao thông và ghi nhận xe cắt qua vạch dừng khi đèn đỏ. Kết quả dùng để kiểm tra video; cần xem lại bằng chứng trước khi đưa ra kết luận thực tế.
 
@@ -82,4 +82,18 @@ Thêm `--headless` vào lệnh trên nếu không cần xem video khi xử lý. 
 
 ```powershell
 python -m pytest tests -q
+```
+
+## Nh?n di?n ph??ng ti?n trong ?nh
+
+??t ?nh `.jpg`, `.png`, `.jpeg`, `.bmp` ho?c `.webp` v?o `images/input/`, r?i ch?y:
+
+```powershell
+python detect_image.py --source images/input --device 0
+```
+
+?nh ?? v? bbox, nh?n v? ?? tin c?y n?m trong `images/output/`. V?i m?t ?nh c? th?:
+
+```powershell
+python detect_image.py --source images/input/anh_01.jpg --device 0 --output images/output
 ```

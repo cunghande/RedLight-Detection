@@ -6,7 +6,6 @@ import numpy as np
 
 logger = logging.getLogger("CameraStabilizer")
 
-
 class CameraStabilizer:
     """
     Module Ổn Định Hóa Rung Lắc Camera (Camera Vibration Stabilization).
