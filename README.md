@@ -22,10 +22,10 @@ python download_models.py
 Từ thư mục gốc của dự án, chạy video mẫu `red1.mp4`:
 
 ```powershell
-python main.py --video dataset_videos/red1.mp4 --headless --output output_red1.mp4
+python main.py --video dataset_videos/red1.mp4 --output output_red1.mp4
 ```
 
-`--headless` xử lý không mở cửa sổ; bỏ cờ này nếu muốn xem trực tiếp. Thiết bị mặc định là GPU NVIDIA khi PyTorch nhận CUDA, hoặc CPU nếu không có GPU. Có thể chọn rõ bằng `--device 0` hay `--device cpu`.
+Lệnh trên mở cửa sổ xem video khi xử lý, đồng thời lưu `output_red1.mp4` ở thư mục gốc của dự án. **Chờ đến khi terminal báo `Video kết quả đã hoàn tất`** rồi mới mở file MP4; đóng terminal giữa chừng có thể để lại file chưa phát được. Muốn chỉ xuất file, không mở cửa sổ, thêm `--headless`. Thiết bị mặc định là GPU NVIDIA khi PyTorch nhận CUDA, hoặc CPU nếu không có GPU. Có thể chọn rõ bằng `--device 0` hay `--device cpu`.
 
 Các video **đã có cấu hình được commit** là `red1`, `red2`, `red3`, `red5`, `red6`, `red7`, `red8`, `red9`, `red10`. Để chạy tất cả trong PowerShell:
 

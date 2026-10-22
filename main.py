@@ -256,7 +256,11 @@ def run_pipeline(
     if output_video:
         fourcc = cv2.VideoWriter_fourcc(*'mp4v')
         writer = cv2.VideoWriter(output_video, fourcc, fps_in, (w_in, h_in))
-        logger.info(f"Đang thiết lập lưu video kết quả ra: {output_video}")
+        if not writer.isOpened():
+            cap.release()
+            trace_file.close()
+            raise RuntimeError(f"Không mở được file video kết quả: {Path(output_video).resolve()}")
+        logger.info(f"Đang lưu video kết quả ra: {Path(output_video).resolve()}")
 
     logger.info("\n" + "=" * 55)
     logger.info(" HỆ THỐNG PHÁT HIỆN VƯỢT ĐÈN ĐỎ ĐANG HOẠT ĐỘNG")
@@ -395,6 +399,7 @@ def run_pipeline(
         (output_dir / 'crossings.json').write_text(json.dumps(crossings, ensure_ascii=False, indent=2), encoding='utf-8')
         if writer:
             writer.release()
+            logger.info(f"Video kết quả đã hoàn tất: {Path(output_video).resolve()}")
         if not headless:
             cv2.destroyAllWindows()
 
