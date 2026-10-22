@@ -1,99 +1,90 @@
 # Phát hiện phương tiện vượt đèn đỏ
 
-Dự án nhận diện phương tiện, theo dõi ID theo thời gian, đọc màu đèn giao thông và ghi nhận xe cắt qua vạch dừng khi đèn đỏ. Kết quả dùng để kiểm tra video; cần xem lại bằng chứng trước khi đưa ra kết luận thực tế.
+Dự án đọc video giao thông, phát hiện và theo dõi phương tiện, xác định trạng thái đèn và ghi nhận xe cắt vạch dừng khi đèn đỏ. Các video đã hiệu chỉnh đi kèm cấu hình vạch dừng và vùng đèn, nên có thể chạy ngay sau khi tải model; không cần gán nhãn hay huấn luyện lại để xem các video này.
 
-## Cài đặt
+## Cài đặt sau khi clone
+
+Trên Windows PowerShell, cần Python 3.10 trở lên và kết nối Internet cho lần tải model đầu tiên:
 
 ```powershell
-pip install -r requirements.txt
+git clone https://github.com/cunghande/RedLight-Detection.git
+cd RedLight-Detection
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt
 python download_models.py
 ```
 
-Kiểm tra GPU NVIDIA:
+`download_models.py` tải YOLO11x pretrained COCO cùng classifier đèn và kiểm tra SHA-256. Model YOLOv8s dùng để tìm đèn đã có trong repo. Nếu PowerShell chặn kích hoạt venv, có thể gọi trực tiếp `.\.venv\Scripts\python.exe` thay cho `python` ở các lệnh sau.
+
+## Chạy video đã gán vạch và vùng đèn
+
+Từ thư mục gốc của dự án, chạy video mẫu `red1.mp4`:
 
 ```powershell
-python -c "import torch; print(torch.cuda.is_available()); print(torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'CPU')"
+python main.py --video dataset_videos/red1.mp4 --headless --output output_red1.mp4
 ```
 
-## Chạy video mới: tự phát hiện
+`--headless` xử lý không mở cửa sổ; bỏ cờ này nếu muốn xem trực tiếp. Thiết bị mặc định là GPU NVIDIA khi PyTorch nhận CUDA, hoặc CPU nếu không có GPU. Có thể chọn rõ bằng `--device 0` hay `--device cpu`.
 
-Chế độ mặc định tự tìm vạch dừng, tự tìm đèn và theo dõi xe. Nó phù hợp để thử nhanh một video chưa từng có cấu hình.
+Các video **đã có cấu hình được commit** là `red1`, `red2`, `red3`, `red5`, `red6`, `red7`, `red8`, `red9`, `red10`. Để chạy tất cả trong PowerShell:
 
 ```powershell
-python main.py --video dataset_videos/red1.mp4 --device 0 --scene-calibrated --output output_red1_new.mp4
+foreach ($n in 1,2,3,5,6,7,8,9,10) {
+    python main.py --video "dataset_videos/red$n.mp4" --headless --output "output_red$n.mp4"
+}
 ```
 
-Thêm `--headless` nếu chỉ muốn xuất file mà không mở cửa sổ xem trực tiếp:
+Mỗi cấu hình trong `configs/scenes/` lưu tọa độ vạch dừng, vùng đèn và hướng xe cho đúng video tương ứng. Chương trình kiểm tra dấu vân tay nội dung video và kích thước khung hình, nên vẫn tìm đúng cấu hình sau khi clone sang máy hoặc thư mục khác. `red4.mp4` hiện **chưa có cấu hình đã xác nhận**; chạy nó ở chế độ mặc định sẽ báo cần hiệu chỉnh, thay vì âm thầm dùng vạch sai.
+
+Kết quả gồm video được vẽ khung xe, ID, đèn và vạch theo đường dẫn `--output`. Mỗi lượt chạy tạo thư mục `violations/run_.../` chứa `events.json`, `events.csv`, `events.md` và ảnh bằng chứng. Kết quả cần được xem lại trước khi kết luận có vi phạm thực tế.
+
+## Video mới chưa có cấu hình
+
+Để gán vạch dừng và vùng đèn cho video mới, chạy có cửa sổ:
 
 ```powershell
-python main.py --video dataset_videos/red1.mp4 --device 0 --headless --output output_red1_new.mp4
+python main.py --video dataset_videos/red4.mp4 --calibrate --output output_red4.mp4
 ```
 
-Lần chạy đầu có thể chậm do quét ứng viên vạch. Cache vạch tự tìm được lưu ở `configs/<tên-video>.json`. Dùng `--redetect` để quét lại:
+Trong cửa sổ hiệu chỉnh, bấm hai đầu vạch dừng rồi hai góc bao vùng đèn điều khiển làn xe đó. Nhấn `S` để lưu, `U` để bỏ điểm gần nhất, `R` để làm lại, `Q` để hủy. Sau khi lưu, chạy lại lệnh bình thường với `--headless`. Cấu hình mới được lưu trong `configs/scenes/` và phải được commit nếu muốn người clone sau sử dụng được.
+
+Có thể thử thuật toán tự dò vạch bằng `--experimental-auto`, nhưng kết quả chỉ nên dùng để chẩn đoán cho video chưa hiệu chỉnh. Luồng mặc định luôn ưu tiên cấu hình đã gán.
+
+## Model và dữ liệu
+
+Pipeline video mặc định dùng `weights/coco/yolo11x.pt` pretrained COCO để nhận diện xe, `weights/yolov8s.pt` để phát hiện đèn và classifier Autoware để đọc trạng thái đèn. Muốn thử checkpoint xe khác mà không đổi model mặc định:
 
 ```powershell
-python main.py --video dataset_videos/red1.mp4 --device 0 --redetect --headless
+python main.py --video dataset_videos/red1.mp4 --vehicle-weights weights/model_khac.pt --headless --output output_thu.mp4
 ```
 
-## Chạy chính xác hơn: hiệu chỉnh 4 điểm
+`dataset_stopline/` là bộ ảnh và nhãn dùng cho thí nghiệm nhận diện vạch; ảnh và nhãn của bộ này không cần để chạy các video đã hiệu chỉnh. Huấn luyện lại cũng không phải bước cài đặt bắt buộc.
 
-Với một góc camera cụ thể, hiệu chỉnh thủ công giúp loại bỏ lỗi chọn nhầm vạch hoặc nhầm cụm đèn. Chạy:
+## Nhận diện phương tiện trong ảnh
+
+Đặt ảnh `.jpg`, `.png`, `.jpeg`, `.bmp` hoặc `.webp` vào `images/input/`, rồi chạy:
 
 ```powershell
-python main.py --video dataset_videos/red1.mp4 --device 0 --calibrate --output output_red1_new.mp4
+python detect_image.py --source images/input --device 0
 ```
 
-Trong cửa sổ hiệu chỉnh:
-
-1. Bấm hai đầu của vạch dừng.
-2. Bấm hai góc bao sát cụm đèn đang điều khiển luồng xe đó.
-3. Nhấn `S` để lưu; `U` bỏ điểm gần nhất; `R` làm lại; `Q` hủy.
-
-Cấu hình gồm đúng bốn điểm. Không cần gán nhãn xe hoặc gán từng khung hình. File cấu hình lưu tại `configs/scenes/` và gắn với đúng video.
-
-Sau khi lưu, chạy bằng cấu hình đã hiệu chỉnh:
-
-```powershell
-python main.py --video dataset_videos/red1.mp4 --device 0 --scene-calibrated --output output_red1_new.mp4
-```
-
-Thêm `--headless` vào lệnh trên nếu không cần xem video khi xử lý. Nếu có nhiều video mới, thay `red1.mp4` bằng `red2.mp4` đến `red10.mp4` và hiệu chỉnh riêng khi muốn dùng chế độ chính xác hơn.
-
-## Kết quả
-
-- Video đã vẽ bbox, ID, màu đèn, vạch và số vi phạm được lưu theo `--output`.
-- Mỗi lần chạy tạo `violations/run_.../` chứa `events.json`, `events.csv`, `events.md`, ảnh bằng chứng và chẩn đoán theo frame.
-- Mỗi ID xe chỉ được ghi một lần trong một lượt chạy.
+Ảnh kết quả nằm trong `images/output/`. Có thể thay `--source` bằng đường dẫn một ảnh và bỏ `--device 0` để tự chọn GPU hoặc CPU.
 
 ## Thành phần chính
 
 | Đường dẫn | Vai trò |
 |---|---|
 | `main.py` | Điều phối pipeline video và tham số dòng lệnh |
-| `calibrate_scene.py` | Giao diện hiệu chỉnh nhanh vạch và cụm đèn |
-| `src/stopline_detector.py` | Tự đề xuất vạch dừng cho video mới |
-| `src/traffic_light_detector.py` | Tìm đèn và đọc màu đèn |
-| `src/light_classifier.py` | Classifier màu đèn pretrained |
-| `src/crossing_tracker.py` | Theo dõi xe cắt đoạn vạch |
-| `src/violation_engine.py` | Ghi nhận sự kiện vượt đèn đỏ |
-| `weights/` | Trọng số model |
+| `calibrate_scene.py` | Giao diện hiệu chỉnh vạch và vùng đèn |
+| `src/stopline_detector.py` | Tự đề xuất vạch cho video mới khi dùng `--experimental-auto` |
+| `src/traffic_light_detector.py` | Phát hiện đèn và đọc màu đèn |
+| `src/crossing_tracker.py` | Theo dõi xe cắt vạch |
+| `src/violation_engine.py` | Ghi nhận sự kiện nghi vượt đèn đỏ |
 
 ## Kiểm thử
 
 ```powershell
+python -m pip install pytest
 python -m pytest tests -q
-```
-
-## Nh?n di?n ph??ng ti?n trong ?nh
-
-??t ?nh `.jpg`, `.png`, `.jpeg`, `.bmp` ho?c `.webp` v?o `images/input/`, r?i ch?y:
-
-```powershell
-python detect_image.py --source images/input --device 0
-```
-
-?nh ?? v? bbox, nh?n v? ?? tin c?y n?m trong `images/output/`. V?i m?t ?nh c? th?:
-
-```powershell
-python detect_image.py --source images/input/anh_01.jpg --device 0 --output images/output
 ```

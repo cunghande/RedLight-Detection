@@ -115,7 +115,7 @@ def run_pipeline(
     device: Optional[str] = None,
     scene_config: Optional[str] = None,
     calibrate: bool = False,
-    experimental_auto: bool = True,
+    experimental_auto: bool = False,
     vehicle_weights: Optional[str] = None,
 ):
     cfg = load_yaml_config("config.yaml")
@@ -422,9 +422,8 @@ if __name__ == "__main__":
                         help="Thiết bị suy luận: auto, cpu hoặc số GPU như 0")
     parser.add_argument('--calibrate', action='store_true', help='Thiết lập lại vạch, đèn và làn xe cho video')
     parser.add_argument('--scene-config', help='Cấu hình góc quay đã xác nhận')
-    parser.add_argument('--scene-calibrated', action='store_true', help='D?ng c?u h?nh v?ch/??n/l?n ?? hi?u ch?nh thay v? t? ph?t hi?n')
-    # Compatibility alias; automatic detection is now the default.
-    parser.add_argument('--experimental-auto', action='store_true', help='Thử vạch CV chưa xác nhận; chỉ để chẩn đoán')
+    parser.add_argument('--scene-calibrated', action='store_true', help='Dùng cấu hình vạch và đèn đã hiệu chỉnh (mặc định)')
+    parser.add_argument('--experimental-auto', action='store_true', help='Thử tự dò vạch cho video chưa có cấu hình; chỉ để chẩn đoán')
     parser.add_argument('--vehicle-weights', help='Checkpoint xe khác để đối chiếu trên cùng video')
     args = parser.parse_args()
 
@@ -440,6 +439,6 @@ if __name__ == "__main__":
         device=args.device,
         scene_config=args.scene_config,
         calibrate=args.calibrate,
-        experimental_auto=not args.scene_calibrated,
+        experimental_auto=args.experimental_auto and not args.scene_calibrated,
         vehicle_weights=args.vehicle_weights,
     )
