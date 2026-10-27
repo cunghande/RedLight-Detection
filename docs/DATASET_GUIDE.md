@@ -1,6 +1,6 @@
 # Chuẩn bị dữ liệu phương tiện
 
-Notebook `notebooks/train-traffic-3-models-modal-h100.ipynb` đã dùng tập con COCO
+Notebook `notebooks/train-traffic-2-models-modal-h100.ipynb` đã dùng tập con COCO
 gồm 1.000 ảnh train, 200 val và 200 test có bounding box. Không cần API key.
 Các model fine-tune từ pretrained COCO, không train từ trọng số ngẫu nhiên.
 Tập con này dùng kiểm tra quy trình, không đại diện camera Việt Nam và không phải COCO test chính thức.
@@ -17,7 +17,7 @@ Tập con này dùng kiểm tra quy trình, không đại diện camera Việt N
 5. Thống nhất 5 lớp: `bicycle`, `car`, `motorcycle`, `bus`, `truck`.
    Quy định nhất quán cách xử lý xe che khuất, xe nhỏ, xe đạp điện. Gán đầy đủ mọi xe thuộc lớp đã chọn.
 6. Giữ thêm ảnh âm tính không có xe; file nhãn `.txt` rỗng. Không để nhãn thiếu.
-7. Xuất **YOLO Detection** (YOLOv8 format dùng được cho cả YOLO11 và bộ chuyển đổi SSD).
+7. Xuất **YOLO Detection** (định dạng nhãn YOLO dùng cho YOLO11 và bộ chuyển đổi SSD).
 8. Nén dataset thành ZIP, upload lên Modal Volume. Trong notebook chọn `DATA_SOURCE = 'zip'`
    và sửa `DATASET_ZIP`. Dùng `RUN_NAME` mới khi thay dataset.
 
@@ -55,7 +55,7 @@ Notebook kiểm tra tọa độ và ảnh trùng byte giữa các tập, không 
 ## Đánh giá
 
 - Chọn checkpoint trên val; chỉ đánh giá test sau khi chốt cấu hình.
-- Cùng dữ liệu và COCO evaluator cho cả ba model; không suy mAP từ precision/recall.
+- Cùng dữ liệu và COCO evaluator cho cả hai model; không suy mAP từ precision/recall.
 - SSD đầu vào 300, YOLO mặc định 640; augmentation và optimizer khác nhau.
   Đây là so sánh cấu hình thực dụng, không chứng minh khác biệt chỉ đến từ kiến trúc.
 - Kết quả đo hiện tại trên COCO subset nằm trong [PAPER_GUIDE.md](PAPER_GUIDE.md);

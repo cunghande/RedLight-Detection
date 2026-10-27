@@ -1,16 +1,15 @@
 # Notebook và kết quả Modal
 
-Lượt train chính thức đã chạy trên Modal H100 bằng
-[`train-traffic-3-models-modal-h100.ipynb`](../notebooks/train-traffic-3-models-modal-h100.ipynb):
-80 epoch mỗi model, dataset COCO subset 1.000 train / 200 val / 200 test.
-Notebook trong dự án có output của lượt chạy và được giữ nguyên.
+Lượt train gốc đã chạy trên Modal H100 với 80 epoch mỗi model, dataset COCO subset
+1.000 train / 200 val / 200 test. Notebook hiện tại
+[`train-traffic-2-models-modal-h100.ipynb`](../notebooks/train-traffic-2-models-modal-h100.ipynb)
+chỉ giữ mã huấn luyện SSD300-VGG16 và YOLO11x; output cũ đã được xóa khỏi notebook.
 
 Kết quả đầy đủ được xuất trên Volume `traffic-training` tại
 `/mnt/traffic-training/exports/traffic_h100_v1_full.zip`. Bản ZIP đã tải về nên được
-lưu ngoài repo để dự phòng. Trong ZIP, `yolo11x/weights/best.pt` là trọng số đã được
-chép vào dự án thành `weights/yolo11x.pt`. `yolov8s/weights/best.pt` trong ZIP là
-model phương tiện 5 lớp; `weights/yolov8s.pt` của dự án là checkpoint COCO 80 lớp
-đã tải sẵn để tìm đèn giao thông.
+lưu ngoài repo để dự phòng. Trong ZIP, `yolo11x/weights/best.pt` là trọng số fine-tune;
+có thể chép thủ công vào `weights/yolo11x.pt` để thử nghiệm. Checkpoint YOLO11x COCO
+tải bằng `download_models.py` cũng dùng để tìm đèn giao thông.
 
 Các file dùng cho báo cáo nằm trong ZIP: `test_benchmark.csv`, `test_benchmark.json`
 và `paper_artifacts/EXPERIMENTAL_RESULTS.md` cùng các biểu đồ. Xem

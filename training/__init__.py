@@ -1,1 +1,1 @@
-"""Training utilities for SSD300-VGG16, YOLOv8s and YOLO11x."""
+"""Training utilities for SSD300-VGG16 and YOLO11x."""

@@ -13,7 +13,7 @@ camera:
 models:
   vehicle_detector:
     # COCO gốc: kiểm tra trực quan red3 ít bbox sai trên đường trống hơn bản fine-tune.
-    # Bản fine-tune vẫn ở weights/yolo11x.pt; dùng --vehicle-weights để so sánh.
+    # Nếu đã tải checkpoint fine-tune riêng, dùng --vehicle-weights để so sánh.
     weights: weights/coco/yolo11x.pt
     # Giữ detection thấp điểm cho bước liên kết thứ hai của ByteTrack.
     conf: 0.10
@@ -21,7 +21,7 @@ models:
     tracker: bytetrack.yaml
     track_names: [bicycle, car, motorcycle, bus, truck]
   traffic_light:
-    weights: weights/yolov8s.pt  # COCO pretrained, class 9 là traffic light
+    weights: weights/coco/yolo11x.pt  # COCO pretrained, class 9 là traffic light
     conf: 0.25
     max_missing_frames: 10
     state_confirm_frames: 3

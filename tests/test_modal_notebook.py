@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def notebook():
-    return nbformat.read(ROOT / "notebooks/train-traffic-3-models-modal-h100.ipynb", as_version=4)
+    return nbformat.read(ROOT / "notebooks/train-traffic-2-models-modal-h100.ipynb", as_version=4)
 
 
 def test_modal_cells_compile_and_embed_current_sources():
@@ -24,6 +24,8 @@ def test_modal_cells_compile_and_embed_current_sources():
         assert (ROOT / "training" / filename).read_text(encoding="utf-8") in sources
     assert "google.colab" not in "\n".join(sources)
     assert "/content/" not in "\n".join(sources)
+    assert "yolov8" not in "\n".join(sources).lower()
+    assert all(not cell.get("outputs") for cell in nb.cells if cell.cell_type == "code")
 
 
 def test_completion_requires_full_epochs_and_checkpoint(tmp_path):
@@ -48,7 +50,7 @@ def test_completion_requires_full_epochs_and_checkpoint(tmp_path):
 def test_pilot_skips_test_and_paper():
     nb = notebook()
     # Deliberately provide no evaluator/model globals: pilot must never touch test.
-    for index in (18, 20):
+    for index in (16, 18):
         exec(nb.cells[index].source, {"PILOT": True})
 
 
@@ -81,6 +83,6 @@ def test_export_isolated_to_current_run(tmp_path):
     (pilot / "pilot.txt").write_text("pilot")
     scope = {"VOLUME_PATH": tmp_path, "OUTPUT_ROOT": output, "PILOT": False}
     for _ in range(2):
-        exec(notebook().cells[22].source, scope)
+        exec(notebook().cells[20].source, scope)
         with zipfile.ZipFile(scope["archive_path"]) as archive:
             assert archive.namelist() == ["test_benchmark.csv"]

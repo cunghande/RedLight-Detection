@@ -1,9 +1,0 @@
-{"schema":"openai.presentation.layout/v5","unit":"px","slide":{"id":"sl/qcjj4e","index":0,"layout":{"id":"ly/nedsf6x8","name":"Blank"},"backgroundColor":"rgba(255,255,255,1)","position":{"left":0,"top":0,"width":1280,"height":720}},
-"elements":[
-{"id":"im/yp47a90n","kind":"image","position":{"left":760,"top":0,"width":520,"height":720},"geometry":"rect","fit":"cover","alt":"Ảnh bằng chứng một phương tiện đi qua nút giao khi đèn đỏ"},
-{"id":"sh/872dkzut","kind":"shape","position":{"left":720,"top":0,"width":80,"height":720},"geometry":"rect","fillColor":"#FFFFFF","lineWidth":0},
-{"id":"sh/98but4be","kind":"shape","position":{"left":76,"top":96,"width":86,"height":6},"geometry":"rect","fillColor":"#236B8E","lineWidth":0},
-{"id":"sh/u9kvm9cz","kind":"textbox","position":{"left":76,"top":144,"width":620,"height":190},"text":"PHÁT HIỆN PHƯƠNG TIỆN\nVƯỢT ĐÈN ĐỎ","style":{"fontSize":45,"typeface":"Arial","color":"#172A3A","bold":true,"alignment":"left"},"geometry":"rect","lineWidth":0},
-{"id":"sh/vadcvetk","kind":"textbox","position":{"left":78,"top":355,"width":570,"height":64},"text":"Hệ thống thị giác máy tính cho camera giao thông cố định","style":{"fontSize":22,"typeface":"Arial","color":"#5F6B76","alignment":"left"},"geometry":"rect","lineWidth":0},
-{"id":"sh/gbmdozu5","kind":"textbox","position":{"left":78,"top":552,"width":380,"height":80},"text":"Nguyễn Tuấn Anh\nLớp 124231","style":{"fontSize":22,"typeface":"Arial","color":"#17212B","bold":true,"alignment":"left"},"geometry":"rect","lineWidth":0}
-]}

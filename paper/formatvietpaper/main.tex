@@ -34,7 +34,7 @@ Bài tập lớn môn Deep Learning}
 
 \renewcommand{\abstractname}{Abstract}
 \begin{abstract}
-Bài báo trình bày hệ thống thị giác máy tính phát hiện phương tiện vượt đèn đỏ từ video camera giao thông cố định. Hệ thống kết hợp nhận diện phương tiện bằng YOLO, gán định danh theo thời gian bằng ByteTrack, phân loại trạng thái đèn và kiểm tra quỹ đạo cắt vạch dừng theo hướng di chuyển. Một sự kiện chỉ được xác nhận khi xe nằm trước vạch, cắt đoạn vạch hữu hạn trong trạng thái đèn đỏ và tiếp tục xuất hiện phía sau vạch đủ số khung hình quy định. Mỗi sự kiện được lưu cùng thời điểm, ID, ảnh toàn cảnh và ảnh cắt phương tiện. Detector được đánh giá trên tập con COCO gồm 1.000 ảnh train, 200 ảnh validation và 200 ảnh test với năm lớp giao thông. Trong cùng giao thức, YOLOv8s đạt mAP@0.50:0.95 là 0,318 và F1 là 0,529, cao nhất trong ba cấu hình SSD300-VGG16, YOLOv8s và YOLO11x; SSD300-VGG16 đạt tốc độ cao nhất, 166,8 FPS trên NVIDIA H100. Kết quả cho thấy YOLOv8s cân bằng tốt nhất giữa độ chính xác, tốc độ và độ phức tạp trên tập thử. Bài báo đồng thời phân tích giới hạn chuyển miền, sai số tích lũy và yêu cầu đánh giá ở mức sự kiện trước khi triển khai thực tế.
+Bài báo trình bày hệ thống thị giác máy tính phát hiện phương tiện vượt đèn đỏ từ video camera giao thông cố định. Hệ thống kết hợp nhận diện phương tiện bằng YOLO, gán định danh theo thời gian bằng ByteTrack, phân loại trạng thái đèn và kiểm tra quỹ đạo cắt vạch dừng theo hướng di chuyển. Một sự kiện chỉ được xác nhận khi xe nằm trước vạch, cắt đoạn vạch hữu hạn trong trạng thái đèn đỏ và tiếp tục xuất hiện phía sau vạch đủ số khung hình quy định. Mỗi sự kiện được lưu cùng thời điểm, ID, ảnh toàn cảnh và ảnh cắt phương tiện. Detector được đánh giá trên tập con COCO gồm 1.000 ảnh train, 200 ảnh validation và 200 ảnh test với năm lớp giao thông. Trong cùng giao thức, YOLO11x đạt mAP@0.50:0.95 là 0,309 và F1 là 0,514, cao hơn SSD300-VGG16; SSD300-VGG16 đạt tốc độ cao hơn, 166,8 FPS so với 65,2 FPS trên NVIDIA H100. Kết quả cho thấy sự đánh đổi giữa độ chính xác và tốc độ của hai cấu hình trên tập thử. Bài báo đồng thời phân tích giới hạn chuyển miền, sai số tích lũy và yêu cầu đánh giá ở mức sự kiện trước khi triển khai thực tế.
 \end{abstract}
 
 \section{Giới thiệu}
@@ -42,13 +42,13 @@ Vượt đèn đỏ có nguy cơ tạo xung đột trực tiếp tại nút giao
 
 Bài toán không dừng ở nhận diện xe trong một ảnh. Hệ thống phải đồng thời xác định phương tiện nào đang được theo dõi, đèn nào điều khiển đúng làn, xe có thực sự đi qua vạch theo chiều bị giám sát hay không, và bằng chứng nào đủ để kiểm tra lại quyết định. Sai số của bất kỳ mô-đun nào cũng có thể lan truyền đến kết quả cuối. Mất ID có thể làm bỏ sót sự kiện; giữ trạng thái đỏ sau chuyển pha có thể tạo báo sai.
 
-Đề tài xây dựng pipeline xử lý video hoàn chỉnh cho camera cố định. Các đóng góp chính gồm: (i) cấu hình hình học riêng cho từng video/camera bằng dấu vân tay nội dung; (ii) phát hiện cắt vạch có hướng trên đoạn thẳng hữu hạn; (iii) cơ chế xác nhận nhiều khung hình và xử lý trạng thái đèn không chắc chắn theo hướng thận trọng; (iv) báo cáo sự kiện có khả năng truy vết; và (v) thực nghiệm thống nhất so sánh ba detector trên cùng dữ liệu và phần cứng.
+Đề tài xây dựng pipeline xử lý video hoàn chỉnh cho camera cố định. Các đóng góp chính gồm: (i) cấu hình hình học riêng cho từng video/camera bằng dấu vân tay nội dung; (ii) phát hiện cắt vạch có hướng trên đoạn thẳng hữu hạn; (iii) cơ chế xác nhận nhiều khung hình và xử lý trạng thái đèn không chắc chắn theo hướng thận trọng; (iv) báo cáo sự kiện có khả năng truy vết; và (v) thực nghiệm thống nhất so sánh hai detector trên cùng dữ liệu và phần cứng.
 
 \section{Cơ sở lý thuyết và công trình liên quan}
 \subsection{Nhận diện đối tượng}
 YOLO định nghĩa nhận diện đối tượng như bài toán hồi quy hợp nhất từ ảnh đến hộp giới hạn và xác suất lớp, tạo nền tảng cho các detector một giai đoạn tốc độ cao \citep{redmon2016}. SSD cũng loại bỏ bước đề xuất vùng, sử dụng các hộp mặc định ở nhiều tỉ lệ và nhiều tầng đặc trưng để dự đoán lớp cùng độ lệch vị trí \citep{liu2016}. Hai hướng tiếp cận phù hợp với video giao thông, nơi thông lượng quan trọng bên cạnh độ chính xác.
 
-Đề tài dùng SSD300-VGG16 làm baseline; YOLOv8s và YOLO11x đại diện cho hai cấu hình YOLO có quy mô khác nhau. Tập thử được trích từ COCO \citep{lin2014} và giữ năm lớp \textit{bicycle}, \textit{car}, \textit{motorcycle}, \textit{bus}, \textit{truck}.
+Đề tài dùng SSD300-VGG16 làm baseline và YOLO11x làm detector YOLO để so sánh. Tập thử được trích từ COCO \citep{lin2014} và giữ năm lớp \textit{bicycle}, \textit{car}, \textit{motorcycle}, \textit{bus}, \textit{truck}.
 
 \subsection{Theo dõi đa đối tượng}
 Phát hiện độc lập từng frame không tạo định danh bền vững. ByteTrack liên kết quỹ đạo bằng cả các hộp có độ tin cậy thấp thay vì loại bỏ chúng ngay \citep{zhang2022}. Điều này hữu ích khi xe bị che khuất hoặc ở xa camera. Hệ thống dùng ByteTrack để nhận ID, rồi áp dụng logic cắt vạch trên chuỗi điểm neo của từng ID.
@@ -56,7 +56,7 @@ Phát hiện độc lập từng frame không tạo định danh bền vững. B
 \subsection{Nhận diện trạng thái đèn}
 Nhận diện đèn thường kết hợp phát hiện vùng đèn và phân loại màu. Kích thước nhỏ, chói sáng, ngược sáng và khác biệt thiết kế khiến chuyển miền trở thành thách thức \citep{pon2023}. Hệ thống dùng ROI đèn gắn với từng làn và MobileNetV2 của Autoware ở định dạng ONNX. MobileNetV2 sử dụng inverted residual và linear bottleneck để giảm chi phí tính toán \citep{sandler2018}. Khi không đủ tự tin, trạng thái được đưa về \code{UNKNOWN}, không suy diễn thành đỏ.
 
-\section{Phát biểu bài toán}
+\section{Bài toán và quá trình tinh chỉnh mô hình}
 Đầu vào là chuỗi frame $I_t$. Detector sinh tập
 \begin{equation}
 D_t=\{(b_i,c_i,p_i)\}_{i=1}^{n_t},
@@ -69,6 +69,20 @@ Mỗi làn được biểu diễn bởi cổng $G=(L,\boldsymbol{d},R,m)$ gồm 
 \end{equation}
 trong đó $\times$ là tích có hướng hai chiều.
 ứng viên xuất hiện khi dấu của $\delta$ đổi theo chiều quy định và đoạn nối hai quan sát liên tiếp giao với chính đoạn $AB$. Sự kiện chỉ được xác nhận nếu $s_t=\text{RED}$ tại lúc cắt, xe tiếp tục ở phía sau vạch tối thiểu $K$ frame và khoảng cách lớn hơn biên $\epsilon$.
+
+\subsection{Khởi tạo từ trọng số tiền huấn luyện}
+Hai detector không được huấn luyện từ đầu trong thí nghiệm này. Trọng số khởi tạo của SSD300-VGG16 được lấy từ \code{SSD300_VGG16_Weights.DEFAULT} trong Torchvision; YOLO11x được nạp từ \code{yolo11x.pt} của Ultralytics. Đây là các checkpoint đã học bài toán phát hiện đối tượng trên COCO với 80 lớp, nên các tầng trích xuất đặc trưng đã nhận biết được cạnh, hình dạng và ngữ cảnh của phương tiện trước khi bắt đầu lần huấn luyện của đề tài. Đề tài chỉ \textit{tinh chỉnh} các checkpoint có sẵn, không tự thực hiện giai đoạn tiền huấn luyện COCO.
+
+Đầu ra cần thích ứng với năm lớp \textit{bicycle}, \textit{car}, \textit{motorcycle}, \textit{bus} và \textit{truck}. Với SSD, mô-đun tạo đặc trưng và đầu hồi quy hộp từ checkpoint COCO được giữ lại; riêng đầu phân lớp được tạo lại cho sáu nhãn, gồm năm phương tiện và lớp nền. SSD dùng chỉ số lớp từ 1 đến 5 cho phương tiện, còn 0 là nền. Với YOLO11x, tệp \code{data.yaml} khai báo năm lớp theo chỉ số 0 đến 4; Ultralytics tự điều chỉnh đầu dự đoán lớp khi nạp checkpoint 80 lớp để huấn luyện trên dữ liệu mới. Việc chuyển nhãn và giữ cùng thứ tự lớp là cần thiết để so sánh các dự đoán trên tập kiểm thử.
+
+\subsection{Quy trình fine-tune trên năm lớp phương tiện}
+Tập con COCO được chuyển về định dạng nhãn YOLO gồm chỉ số lớp và hộp giới hạn chuẩn hóa $(x_c,y_c,w,h)$. Khi huấn luyện SSD, bộ đọc dữ liệu đổi các hộp này sang tọa độ góc $(x_1,y_1,x_2,y_2)$ theo kích thước ảnh và cộng một vào chỉ số lớp để dành nhãn 0 cho nền. Chỉ tập train tham gia cập nhật trọng số; tập validation được dùng để chọn checkpoint có mAP@0.50:0.95 cao nhất sau từng epoch; tập test chỉ được đánh giá sau khi đã chọn xong checkpoint. Toàn bộ mô hình được đưa vào bộ tối ưu, không đặt tầng đóng băng trong mã huấn luyện.
+
+Ở SSD, ảnh đi qua phép biến đổi đầu vào của Torchvision về kích thước $300\times300$. Mỗi minibatch cập nhật cả đầu phân lớp mới và các tham số đã tiền huấn luyện dựa trên tổng loss phân lớp và định vị hộp. Vòng lặp sử dụng SGD với momentum 0,9, learning rate ban đầu 0,002, weight decay 0,0005 và batch 8. Learning rate giảm mười lần tại 60\% và 85\% tổng số epoch; gradient được chặn theo chuẩn 10. Phép tăng cường viết riêng cho SSD là lật ngang ngẫu nhiên xác suất 0,5 và đồng thời cập nhật tọa độ hộp.
+
+YOLO11x nhận ảnh ở kích thước $640\times640$ và được tinh chỉnh bằng AdamW với learning rate ban đầu 0,001 và batch 4. Quy trình dùng tăng cường dữ liệu và các thành phần loss phát hiện theo cấu hình Ultralytics của lần chạy, cùng huấn luyện hỗn hợp độ chính xác (AMP). Mỗi mô hình chạy tối đa 80 epoch với seed 42; checkpoint tốt nhất được chọn trên validation. Vì SSD và YOLO khác kích thước ảnh, phép tăng cường và bộ tối ưu, kết quả so sánh là kết quả của hai \textit{cấu hình huấn luyện thực tế}, không tách riêng tác động của kiến trúc.
+
+Các checkpoint fine-tune được dùng cho phép so sánh detector ở Mục~\ref{sec:experiments}. Pipeline xử lý video minh họa vẫn nạp YOLO11x pretrained COCO; chưa thay bằng checkpoint fine-tune vì tập con COCO không đại diện cho camera mục tiêu. Trong phép chia của đề tài, train lấy từ \code{train2017}, còn validation và test là hai tập ảnh không trùng nhau lấy từ \code{val2017}. Vì cả ba tập dữ liệu vẫn thuộc miền ảnh COCO, kết quả test chưa đo được khả năng chuyển sang camera giao thông Việt Nam. Đánh giá chuyển miền cần một bộ video camera độc lập, được gán nhãn và tách theo camera.
 
 \section{Kiến trúc hệ thống}
 \subsection{Pipeline tổng thể}
@@ -106,7 +120,7 @@ Detector giữ năm lớp phương tiện. Cấu hình video hiện tại dùng 
 Mỗi ID chỉ được ghi một lần trong một lượt chạy. Track mất quá 0,20 giây bị loại khỏi trạng thái chờ. Nếu mất quan sát đúng lúc cắt vạch, cả quan sát trước và sau khoảng trống đều phải ở đèn đỏ. Điều kiện này hạn chế suy diễn qua đoạn video thiếu bằng chứng.
 
 \subsection{Trạng thái đèn}
-ROI đèn được đặt riêng theo làn để tránh chọn nhầm đèn rẽ hoặc đèn của hướng giao cắt. Crop được chuẩn hóa về $224\times224$ và phân loại bởi MobileNetV2 với ngưỡng 0,80. Trạng thái mới phải lặp ba frame trước khi chấp nhận. Trong chuyển tiếp hoặc khi các đèn mâu thuẫn, đầu ra là \code{UNKNOWN}. Hệ thống không giữ \code{RED} khi mất tín hiệu; lựa chọn này có thể giảm recall nhưng tránh báo sai do trạng thái cũ bị kéo dài.
+ROI đèn được đặt riêng theo làn để tránh chọn nhầm đèn rẽ hoặc đèn của hướng giao cắt. YOLO11x pretrained COCO xác định hộp đèn trong ROI; crop được chuẩn hóa về $224\times224$ và phân loại bởi MobileNetV2 với ngưỡng 0,80. Trạng thái mới phải lặp ba frame trước khi chấp nhận. Trong chuyển tiếp hoặc khi các đèn mâu thuẫn, đầu ra là \code{UNKNOWN}. Hệ thống không giữ \code{RED} khi mất tín hiệu; lựa chọn này có thể giảm recall nhưng tránh báo sai do trạng thái cũ bị kéo dài.
 
 \subsection{Cắt vạch và xác nhận}
 Thuật toán lưu vị trí cuối ở trước vạch cho từng cặp (ID, cổng). Khi điểm mới ở sau vạch, nó kiểm tra giao thật giữa đoạn quỹ đạo và đoạn vạch hữu hạn. Ứng viên đỏ phải duy trì phía sau vạch ba frame và vượt biên hai pixel. Nếu xe quay lại trước khi đủ xác nhận, ứng viên bị hủy.
@@ -123,7 +137,7 @@ Hệ thống được hiện thực bằng Python, OpenCV, PyTorch/Ultralytics v
 \midrule
 Xe & 5 lớp; confidence 0,10; ảnh 960 \\
 Tracker & ByteTrack; mất tối đa 0,20 giây \\
-Đèn & MobileNetV2 ONNX; confidence 0,80 \\
+Đèn & YOLO11x COCO, MobileNetV2 ONNX; confidence 0,80 \\
 Ổn định đèn & Xác nhận trạng thái mới 3 frame \\
 Cắt vạch & Giao đoạn có hướng; biên 2 pixel \\
 Vi phạm & Đỏ tại lúc cắt; xác nhận 3 frame \\
@@ -136,11 +150,11 @@ Báo cáo & MP4, JSON, CSV, Markdown, JPEG \\
 
 Công cụ đánh giá sự kiện chỉ chấp nhận lượt chạy hoàn tất. Nó ghép một-một dự đoán và ground truth theo cổng với sai lệch thời gian tối đa 0,5 giây; dự đoán trùng được tính false positive.
 
-\section{Thiết kế thực nghiệm}
+\section{Thiết kế thực nghiệm}\label{sec:experiments}
 \subsection{Dữ liệu và huấn luyện}
-Tập con COCO gồm 1.000 ảnh train với 3.539 đối tượng, 200 ảnh validation với 685 đối tượng và 200 ảnh test với 762 đối tượng. Test không được dùng để chọn epoch hoặc siêu tham số. Ba mô hình dùng cùng thứ tự lớp và phép chia dữ liệu.
+Tập con COCO gồm 1.000 ảnh train với 3.539 đối tượng, 200 ảnh validation với 685 đối tượng và 200 ảnh test với 762 đối tượng. Test không được dùng để chọn epoch hoặc siêu tham số. Hai mô hình dùng cùng thứ tự lớp và phép chia dữ liệu.
 
-Mỗi mô hình được huấn luyện 80 epoch từ trọng số pretrained, seed 42. SSD300-VGG16 dùng ảnh $300\times300$, batch 8 và learning rate ban đầu 0,002. Hai YOLO dùng ảnh $640\times640$, batch 8 và cấu hình tối ưu mặc định. Checkpoint tốt nhất được chọn bằng mAP@0.50:0.95 trên validation.
+Mỗi mô hình được huấn luyện 80 epoch từ trọng số pretrained, seed 42, theo quy trình ở Mục~3. SSD300-VGG16 dùng ảnh $300\times300$ và batch 8; YOLO11x dùng ảnh $640\times640$ và batch 4. Checkpoint tốt nhất được chọn bằng mAP@0.50:0.95 trên validation.
 
 \subsection{Chỉ số}
 Độ chính xác hộp dùng COCO mAP@0.50:0.95 và mAP@0.50. Với confidence 0,25 và IoU 0,50:
@@ -152,7 +166,7 @@ Tốc độ được đo batch 1, FP32 trên NVIDIA H100 sau warm-up và đồng
 
 \section{Kết quả và đánh giá}
 \subsection{So sánh định lượng}
-Bảng~\ref{tab:results} cho thấy YOLOv8s đạt cao nhất ở mAP, precision, recall và F1. So với SSD, mAP@0.50:0.95 tăng 0,061 điểm tuyệt đối và F1 tăng 0,084 điểm. YOLO11x có mAR100 cao nhất nhưng thấp hơn YOLOv8s ở mAP và F1.
+Bảng~\ref{tab:results} cho thấy YOLO11x cao hơn SSD300-VGG16 ở mAP, mAR100, precision, recall và F1. So với SSD, mAP@0.50:0.95 tăng 0,052 điểm tuyệt đối và F1 tăng 0,069 điểm. SSD có tốc độ detector cao hơn trên H100.
 
 \begin{table*}[t]
 \centering\small
@@ -160,9 +174,8 @@ Bảng~\ref{tab:results} cho thấy YOLOv8s đạt cao nhất ở mAP, precision
 \toprule
 Mô hình & mAP50--95 & mAP50 & mAR100 & Precision & Recall & F1 & FPS & Tham số (M) \\
 \midrule
-SSD300-VGG16 & 0,257 & 0,433 & 0,385 & 0,544 & 0,385 & 0,445 & \textbf{166,8} & 24,3 \\
-YOLOv8s & \textbf{0,318} & \textbf{0,519} & 0,460 & \textbf{0,570} & \textbf{0,497} & \textbf{0,529} & 119,9 & \textbf{11,1} \\
-YOLO11x & 0,309 & 0,513 & \textbf{0,474} & 0,554 & 0,484 & 0,514 & 65,2 & 56,9 \\
+SSD300-VGG16 & 0,257 & 0,433 & 0,385 & 0,544 & 0,385 & 0,445 & \textbf{166,8} & \textbf{24,3} \\
+YOLO11x & \textbf{0,309} & \textbf{0,513} & \textbf{0,474} & \textbf{0,554} & \textbf{0,484} & \textbf{0,514} & 65,2 & 56,9 \\
 \bottomrule
 \end{tabular}
 \caption{Kết quả trên 200 ảnh test; P/R/F1 dùng confidence 0,25 và IoU 0,50.}
@@ -172,11 +185,11 @@ YOLO11x & 0,309 & 0,513 & \textbf{0,474} & 0,554 & 0,484 & 0,514 & 65,2 & 56,9 \
 \begin{figure*}[t]
 \centering
 \includegraphics[width=0.98\textwidth]{figures/model_comparison.png}
-\caption{So sánh độ chính xác và tốc độ. YOLOv8s dẫn đầu về mAP và F1; SSD nhanh nhất.}
+\caption{So sánh độ chính xác và tốc độ. YOLO11x cao hơn về mAP và F1; SSD nhanh hơn.}
 \label{fig:model-comparison}
 \end{figure*}
 
-SSD nhanh hơn YOLOv8s khoảng 39,1\% nhưng giảm chất lượng hộp. YOLO11x có tham số gấp khoảng 5,1 lần YOLOv8s, trong khi mAP thấp hơn 0,009 và tốc độ chỉ bằng 54,3\%. Quy mô lớn hơn không mang lại lợi ích tương ứng trên tập hiện tại.
+SSD nhanh hơn YOLO11x khoảng 2,56 lần và có ít hơn khoảng 2,34 lần số tham số, nhưng mAP@0.50:0.95 thấp hơn 0,052 điểm. Hai cấu hình thể hiện sự đánh đổi rõ rệt giữa chất lượng hộp và tốc độ.
 
 \begin{figure}[t]
 \centering
@@ -185,10 +198,10 @@ SSD nhanh hơn YOLOv8s khoảng 39,1\% nhưng giảm chất lượng hộp. YOLO
 \label{fig:tradeoff}
 \end{figure}
 
-YOLOv8s nằm gần biên tối ưu thực dụng: mAP cao nhất, 119,9 FPS và 11,1 triệu tham số. Tuy nhiên, pipeline video hiện dùng YOLO11x pretrained COCO vì kiểm tra trực quan ở camera mục tiêu cho thấy checkpoint tùy biến nhỏ có thể sinh hộp giả trên mặt đường trống. Quyết định triển khai phải dựa trên dữ liệu camera được gán nhãn, không chỉ tập con COCO.
+Pipeline video hiện dùng YOLO11x pretrained COCO vì kiểm tra trực quan ở camera mục tiêu cho thấy checkpoint tùy biến từ tập con COCO có thể sinh hộp giả trên mặt đường trống. Quyết định triển khai phải dựa trên dữ liệu camera được gán nhãn, không chỉ tập con COCO.
 
 \subsection{Chi phí huấn luyện}
-YOLOv8s huấn luyện trong 9,2 phút, checkpoint 21,5 MB và peak VRAM 2.654 MB. SSD cần 16,4 phút, checkpoint 92,6 MB và 1.090 MB. YOLO11x cần 27,4 phút, checkpoint 109,1 MB và 7.348 MB. YOLOv8s đồng thời có checkpoint nhỏ nhất và thời gian huấn luyện ngắn nhất.
+SSD cần 16,4 phút, checkpoint 92,6 MB và peak VRAM 1.090 MB. YOLO11x cần 27,4 phút, checkpoint 109,1 MB và peak VRAM 7.348 MB. SSD có thời gian huấn luyện ngắn hơn và dùng ít bộ nhớ GPU hơn trong lần chạy này.
 
 Đây là so sánh cấu hình thực dụng, không phải thí nghiệm cô lập kiến trúc: kích thước đầu vào, augmentation và tối ưu giữa SSD và YOLO khác nhau. Kết quả chỉ mô tả các cấu hình đã chạy.
 
@@ -230,7 +243,7 @@ Thí nghiệm detector chỉ dùng một seed và tập con COCO nhỏ nên chư
 Đánh giá tiếp theo cần gán thủ công toàn bộ sự kiện trên video test, kể cả xe detector bỏ sót và video không vi phạm. Mỗi nhãn chứa ID cổng và thời điểm cắt theo cùng quy ước điểm neo. Dữ liệu phải chia theo camera/video, không chia ngẫu nhiên frame lân cận. Cần bổ sung ban đêm, mưa, ngược sáng, ùn tắc, xe máy và che khuất. Các mô-đun nên được đo riêng bằng mAP, confusion matrix đèn, IDF1/HOTA và sai số thời điểm cắt trước khi đánh giá đầu-cuối.
 
 \section{Kết luận}
-Bài báo trình bày hệ thống phát hiện phương tiện vượt đèn đỏ có kiến trúc mô-đun, hình học có hướng và bằng chứng truy vết. YOLOv8s đạt cân bằng tốt nhất trên tập con COCO: mAP@0.50:0.95 bằng 0,318, F1 bằng 0,529 và 119,9 FPS với 11,1 triệu tham số. SSD nhanh nhất nhưng kém chính xác; YOLO11x lớn hơn đáng kể mà không cải thiện mAP.
+Bài báo trình bày hệ thống phát hiện phương tiện vượt đèn đỏ có kiến trúc mô-đun, hình học có hướng và bằng chứng truy vết. Trên tập con COCO, YOLO11x đạt mAP@0.50:0.95 bằng 0,309 và F1 bằng 0,514, cao hơn SSD300-VGG16 (0,257 và 0,445). SSD đạt 166,8 FPS so với 65,2 FPS của YOLO11x trên H100 và dùng ít tham số hơn.
 
 Giá trị chính của hệ thống nằm ở việc hợp nhất nhận diện, theo dõi, trạng thái đèn và quỹ đạo thành quyết định sự kiện có bằng chứng. Tuy nhiên, chỉ số detector chưa đủ để khẳng định độ chính xác toàn pipeline. Hướng tiếp theo là xây dựng dữ liệu camera thực tế, gán nhãn sự kiện độc lập, đánh giá theo camera giữ kín và tối ưu cho điều kiện giao thông Việt Nam.
 

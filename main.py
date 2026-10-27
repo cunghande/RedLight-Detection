@@ -201,10 +201,10 @@ def run_pipeline(
                                      light_cfg.get('classifier_conf', 0.8))
     # Always load the light detector. For calibrated scenes it finds a tight
     # lamp box inside the user-selected signal region before color inference.
-    light_weights = light_cfg.get("weights", "weights/yolov8s.pt")
+    light_weights = light_cfg.get("weights", "weights/coco/yolo11x.pt")
     if not Path(light_weights).is_file():
         raise FileNotFoundError(f"Cannot find traffic-light weights: {light_weights}")
-    light_model = YOLO(light_weights)
+    light_model = yolo_model if Path(light_weights).resolve() == Path(model_weights).resolve() else YOLO(light_weights)
     if light_model.names.get(9) != "traffic light":
         raise ValueError("Traffic-light model must expose COCO class 9")
     detectors = {}

@@ -198,7 +198,7 @@ def test_paper_artifacts_are_generated_from_measured_results(tmp_path, monkeypat
     monkeypatch.setattr(training, "_load_best_model",
                         lambda name, output_root, names, device: (Detector(), "ssd", Path("fixture")))
     artifact_dir, table = training.create_paper_artifacts(normalized, tmp_path, qualitative_images=1)
-    assert len(table) == 3
+    assert len(table) == 2
     expected = ["EXPERIMENTAL_RESULTS.md", "dataset_distribution.png", "training_curves.png",
                 "accuracy_speed_complexity.png", "per_class_ap.png", "per_class_metrics.csv",
                 "qualitative_comparison.png"]

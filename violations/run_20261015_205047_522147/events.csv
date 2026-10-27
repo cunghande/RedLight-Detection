@@ -1,2 +1,0 @@
-﻿violation_number,event_id,track_id,vehicle_type,confidence,frame_index,timestamp,stop_line_violated,scene_image,vehicle_crop_image
-1,EV-20261015-205100-175459-0012,12,O to,0.91,100,2026-10-15 20:51:00,Vach dung (Xac nhan - Y=680),EV-20261015-205100-175459-0012_scene.jpg,EV-20261015-205100-175459-0012_vehicle.jpg

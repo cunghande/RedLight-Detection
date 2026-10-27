@@ -1,2 +1,0 @@
-﻿violation_number,event_id,track_id,vehicle_type,confidence,frame_index,timestamp,stop_line_violated,scene_image,vehicle_crop_image,crossing_frame,confirmed_frame,video_time_seconds,light_at_crossing,gate_id,status
-1,EV-20261015-221926-419065-0011,11,O to,0.83,94,2026-10-15 22:19:26,VACH 1,EV-20261015-221926-419065-0011_scene.jpg,EV-20261015-221926-419065-0011_vehicle.jpg,92,94,3.033,RED,gate_1,confirmed_red_crossing

@@ -10,11 +10,11 @@ ROOT = Path(__file__).resolve().parent
 FIGURES = ROOT / "figures"
 FIGURES.mkdir(exist_ok=True)
 
-MODELS = ["SSD300-VGG16", "YOLOv8s", "YOLO11x"]
-MAP = np.array([0.257269, 0.318488, 0.309424])
-F1 = np.array([0.445347, 0.529347, 0.514224])
-FPS = np.array([166.793386, 119.899674, 65.163612])
-PARAMS = np.array([24.280556, 11.137535, 56.879551])
+MODELS = ["SSD300-VGG16", "YOLO11x"]
+MAP = np.array([0.257269, 0.309424])
+F1 = np.array([0.445347, 0.514224])
+FPS = np.array([166.793386, 65.163612])
+PARAMS = np.array([24.280556, 56.879551])
 
 
 plt.rcParams.update(
@@ -41,7 +41,7 @@ axes[0].legend(frameon=False, loc="upper left")
 axes[0].bar_label(bars_map, fmt="%.3f", padding=2, fontsize=8)
 axes[0].bar_label(bars_f1, fmt="%.3f", padding=2, fontsize=8)
 
-colors = ["#2a9d62", "#2a9d62", "#2a9d62"]
+colors = ["#2a9d62", "#2a9d62"]
 bars_fps = axes[1].bar(x, FPS, width=0.56, color=colors)
 axes[1].set_ylabel("Khung hình/giây")
 axes[1].set_title("Tốc độ detector trên NVIDIA H100")
@@ -50,13 +50,13 @@ axes[1].set_ylim(0, 190)
 axes[1].grid(axis="y", alpha=0.25, linewidth=0.7)
 axes[1].bar_label(bars_fps, fmt="%.1f", padding=2, fontsize=8)
 
-fig.suptitle("So sánh ba mô hình nhận diện phương tiện", fontsize=11, fontweight="bold")
+fig.suptitle("So sánh hai mô hình nhận diện phương tiện", fontsize=11, fontweight="bold")
 fig.tight_layout()
 fig.savefig(FIGURES / "model_comparison.png", dpi=240, bbox_inches="tight")
 plt.close(fig)
 
 fig, ax = plt.subplots(figsize=(6.0, 4.0))
-scatter = ax.scatter(FPS, MAP, s=PARAMS * 22, c=["#4c78a8", "#f58518", "#54a24b"], alpha=0.82,
+scatter = ax.scatter(FPS, MAP, s=PARAMS * 22, c=["#4c78a8", "#54a24b"], alpha=0.82,
                      edgecolor="white", linewidth=1.2)
 for model, fps, score in zip(MODELS, FPS, MAP):
     ax.annotate(model, (fps, score), xytext=(6, 6), textcoords="offset points", fontsize=9)

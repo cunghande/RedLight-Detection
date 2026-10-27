@@ -15,7 +15,7 @@ from PIL import Image
 from torch.utils.data import DataLoader, Dataset
 from torchvision.transforms import functional as TF
 
-MODEL_NAMES = ("ssd300_vgg16", "yolov8s", "yolo11x")
+MODEL_NAMES = ("ssd300_vgg16", "yolo11x")
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
 
 
@@ -400,7 +400,7 @@ def train_ssd(data_yaml, output_dir, epochs=80, batch=8, lr=0.002, workers=2, se
 def train_yolo(model_name, data_yaml, output_root, epochs=80, imgsz=640, batch=4, workers=2,
                seed=42, resume=False):
     from ultralytics import YOLO
-    if model_name not in ("yolov8s", "yolo11x"):
+    if model_name != "yolo11x":
         raise ValueError(model_name)
     output_root = Path(output_root)
     run = output_root / model_name
@@ -694,7 +694,9 @@ def create_paper_artifacts(data_yaml, output_root, imgsz=640, qualitative_images
             predictions[name].append(predict_detector(model, image, device, kind, imgsz, conf=.25))
         del model; gc.collect()
         if torch.cuda.is_available(): torch.cuda.empty_cache()
-    fig, axes = plt.subplots(len(images_targets), 4, figsize=(18, 4.5*len(images_targets)), squeeze=False)
+    fig, axes = plt.subplots(len(images_targets), len(MODEL_NAMES) + 1,
+                             figsize=(4.5 * (len(MODEL_NAMES) + 1), 4.5 * len(images_targets)),
+                             squeeze=False)
     for row_index, (image, target) in enumerate(images_targets):
         _draw_boxes(axes[row_index, 0], image, target["boxes"], target["labels"]-1,
                     test.names, title="Ground truth")
@@ -719,8 +721,8 @@ def create_paper_artifacts(data_yaml, output_root, imgsz=640, qualitative_images
 
 ## Thiết lập thực nghiệm
 
-Cả ba mô hình sử dụng cùng cách chia train/validation/test và cùng thứ tự lớp. SSD300-VGG16 dùng
-đầu vào 300×300; YOLOv8s và YOLO11x dùng {imgsz}×{imgsz}. Checkpoint tốt nhất chỉ được chọn theo
+Hai mô hình sử dụng cùng cách chia train/validation/test và cùng thứ tự lớp. SSD300-VGG16 dùng
+đầu vào 300×300; YOLO11x dùng {imgsz}×{imgsz}. Checkpoint tốt nhất chỉ được chọn theo
 mAP trên validation. Độ chính xác cuối cùng được đo một lần trên test bằng COCO box AP.
 Precision, Recall, F1 và confusion matrix dùng confidence 0,25 và IoU 0,50. Tốc độ detector được đo
 với batch=1, FP32 trên **{report['device']}**, sau warm-up, không tính đọc file và tracking.
@@ -747,7 +749,7 @@ sang toàn bộ hệ thống vượt đèn đỏ nếu chưa đánh giá ở m�
 - `accuracy_speed_complexity.png`: độ chính xác, tốc độ và số tham số.
 - `per_class_ap.png`: AP của từng lớp phương tiện.
 - `pr_*.png` và `confusion_*.png`: PR curve và confusion matrix của từng model.
-- `qualitative_comparison.png`: ground truth và dự đoán của ba model.
+- `qualitative_comparison.png`: ground truth và dự đoán của hai model.
 
 ## Hạn chế
 

@@ -17,15 +17,15 @@ from src.traffic_light_detector import TrafficLightDetector
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def test_pipeline_uses_pretrained_baseline_and_keeps_finetuned_checkpoint():
+def test_pipeline_uses_downloadable_yolo11_checkpoint():
     vehicle = yaml.safe_load((ROOT / "config.yaml").read_text(encoding="utf-8"))["models"]["vehicle_detector"]
     assert vehicle["weights"] == "weights/coco/yolo11x.pt"
-    assert (ROOT / 'weights/yolo11x.pt').is_file()
-    assert (ROOT / vehicle["weights"]).is_file()
+    from download_models import FILES
+    assert "coco/yolo11x.pt" in FILES
     assert vehicle["track_names"] == ["bicycle", "car", "motorcycle", "bus", "truck"]
     light = yaml.safe_load((ROOT / "config.yaml").read_text(encoding="utf-8"))["models"]["traffic_light"]
-    assert light["weights"] == "weights/yolov8s.pt"
-    assert (ROOT / light["weights"]).is_file()
+    assert light["weights"] == "weights/coco/yolo11x.pt"
+    assert light["weights"] == vehicle["weights"]
 
 
 def test_trajectory_uses_names_from_custom_checkpoint():
@@ -167,6 +167,9 @@ def test_violation_records_id_and_increments_only_once(tmp_path):
 def test_three_frame_video_runs_with_real_models(tmp_path, monkeypatch):
     import main
 
+    if not (ROOT / "weights/coco/yolo11x.pt").is_file():
+        pytest.skip("Download YOLO11x with python download_models.py")
+
     source = cv2.VideoCapture(str(ROOT / "dataset_videos/red1.mp4"))
     ok, first = source.read()
     if not ok:
@@ -203,7 +206,7 @@ def test_three_frame_video_runs_with_real_models(tmp_path, monkeypatch):
     reports = list((tmp_path / "events").rglob("events.json"))
     assert len(reports) == 1
     assert isinstance(json.loads(reports[0].read_text(encoding="utf-8")), list)
-    analyzer = TrajectoryAnalyzer(model_weights="weights/yolo11x.pt")
+    analyzer = TrajectoryAnalyzer(model_weights="weights/coco/yolo11x.pt")
     motion = analyzer.extract_motion_features(str(sample), sample_frames=3)
-    assert analyzer.track_classes == [0, 1, 2, 3, 4]
+    assert analyzer.track_classes == [1, 2, 3, 5, 7]
     assert motion["frame_shape"] == (height, width)

@@ -15,7 +15,7 @@ python -m pip install -r requirements.txt
 python download_models.py
 ```
 
-`download_models.py` tải YOLO11x pretrained COCO cùng classifier đèn và kiểm tra SHA-256. Model YOLOv8s dùng để tìm đèn đã có trong repo. Nếu PowerShell chặn kích hoạt venv, có thể gọi trực tiếp `.\.venv\Scripts\python.exe` thay cho `python` ở các lệnh sau.
+`download_models.py` tải YOLO11x pretrained COCO cùng classifier đèn và kiểm tra SHA-256. Cùng checkpoint YOLO11x COCO được dùng để tìm đèn giao thông. Nếu PowerShell chặn kích hoạt venv, có thể gọi trực tiếp `.\.venv\Scripts\python.exe` thay cho `python` ở các lệnh sau.
 
 ## Chạy video đã gán vạch và vùng đèn
 
@@ -53,7 +53,7 @@ Có thể thử thuật toán tự dò vạch bằng `--experimental-auto`, như
 
 ## Model và dữ liệu
 
-Pipeline video mặc định dùng `weights/coco/yolo11x.pt` pretrained COCO để nhận diện xe, `weights/yolov8s.pt` để phát hiện đèn và classifier Autoware để đọc trạng thái đèn. Muốn thử checkpoint xe khác mà không đổi model mặc định:
+Pipeline video mặc định dùng `weights/coco/yolo11x.pt` pretrained COCO để nhận diện xe, `weights/coco/yolo11x.pt` để phát hiện đèn và classifier Autoware để đọc trạng thái đèn. Muốn thử checkpoint xe khác mà không đổi model mặc định:
 
 ```powershell
 python main.py --video dataset_videos/red1.mp4 --vehicle-weights weights/model_khac.pt --headless --output output_thu.mp4
